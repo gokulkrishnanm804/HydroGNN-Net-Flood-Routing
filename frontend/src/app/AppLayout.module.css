@@ -1,0 +1,14 @@
+.layout { display: flex; min-height: 100vh; position: relative; }
+
+.main {
+  flex: 1;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  transition: margin-left 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+
+.pageContent {
+  min-height: 100vh;
+  padding-top: 64px; /* topbar height */
+}

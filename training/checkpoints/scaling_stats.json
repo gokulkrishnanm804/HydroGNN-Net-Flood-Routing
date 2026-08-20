@@ -1,0 +1,24 @@
+{
+  "means": {
+    "rain_observed": 9.80798710351665,
+    "soil_moisture": 0.7963200542344931,
+    "temperature": 24.998654765261563,
+    "humidity": 79.99045734121546,
+    "rain_forecast_6h": 9.883884550951532,
+    "rain_forecast_24h": 10.159719000659226,
+    "rain_forecast_72h": 11.12324474145843,
+    "water_level": 11.786711391647954,
+    "discharge": 109.85470397702042
+  },
+  "stds": {
+    "rain_observed": 15.032257860074905,
+    "soil_moisture": 0.26709924549115394,
+    "temperature": 3.5742738559021285,
+    "humidity": 10.65582301185073,
+    "rain_forecast_6h": 14.992013380051969,
+    "rain_forecast_24h": 14.917025037287036,
+    "rain_forecast_72h": 14.846933314002428,
+    "water_level": 19.481938080206273,
+    "discharge": 183.8647387913736
+  }
+}

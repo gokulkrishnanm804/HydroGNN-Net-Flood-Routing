@@ -1,0 +1,27 @@
+# HydroGNN-Net Configuration File
+
+system:
+  project_title: "HydroGNN-Net: A Spatio-Temporal Graph Neural Network for Real-Time Multi-Scale Flood Routing"
+  domain: "Environmental Technology & Disaster Support"
+  region: "Tamil Nadu River Basins"
+
+routing_thresholds:
+  warning_ratio: 0.90
+  critical_ratio: 1.00
+  base_flow_cumecs: 10.0
+
+scheduler:
+  default_interval_sec: 900
+  fast_demo_interval_sec: 15
+
+retraining:
+  default_interval_days: 7
+  min_levels_count_ratio: 100
+  incremental_learning_rate: 0.00001
+  epochs: 2
+
+models:
+  hidden_dim: 64
+  heads: 4
+  num_layers: 2
+  dropout: 0.1

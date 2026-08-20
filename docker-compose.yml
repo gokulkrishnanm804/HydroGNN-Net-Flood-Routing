@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hydrognn_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////app/hydrognn.db
+      - JWT_SECRET=hydrognn2026_jwt_secret_token_key_production
+    volumes:
+      - ./hydrognn.db:/app/hydrognn.db
+      - ./logs:/app/logs
+
+  frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile
+    container_name: hydrognn_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend

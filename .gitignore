@@ -1,0 +1,184 @@
+# =============================================================================
+# HydroGNN-Net .gitignore
+# Covers Root, Backend (FastAPI/Python), and Frontend (Next.js & Vite/React)
+# =============================================================================
+
+# ── Environment & Secrets (NEVER COMMIT SENSITIVE KEYS) ──────────────────────
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+# Allow committing documentation/template examples
+!.env.example
+!*.env.example
+
+# ── Database & Local Storage ──────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+hydrognn.db
+
+# ── Logs & Debugging ──────────────────────────────────────────────────────────
+logs/
+*.log
+backend.log
+backend_err.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── Python / Backend ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# ── Node / Frontend (Next.js & Vite) ─────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js build output
+.next/
+out/
+
+# Vite / React build output
+dist/
+dist-ssr/
+
+# Vercel
+.vercel/
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Model Checkpoints & Large Binary Weights ─────────────────────────────────
+# Uncomment if checkpoints are too large for standard git push (>100MB)
+# *.pt
+# *.ckpt
+# *.safetensors
+# *.bin
+# *.onnx
+
+# ── IDEs & Operating System ───────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (PyCharm, WebStorm, etc.)
+.idea/
+
+# Antigravity / Gemini internal artifacts
+.gemini/
+
+# ── HydroGNN-Net Dataset & Generated Files ────────────────────────────────────
+
+# Processed datasets
+processed_dataset/
+datasets/processed/
+
+# Raw pipeline datasets
+pipeline/dataset/raw/
+
+# Generated/processed pipeline data
+pipeline/dataset/processed/
+pipeline/dataset/processed_test/
+pipeline/dataset/graphs/
+pipeline/dataset/models/
+
+# Large scientific data files
+*.nc
+*.tif
+*.tiff
+*.parquet
+*.npy
+*.npz
+
+# GIS / shapefile data
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.sbn
+*.sbx
+*.zip
+
+# ── Trained Models / Checkpoints ─────────────────────────────────────────────
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+
+# ── Generated State / Cache ──────────────────────────────────────────────────
+download_state.json
+__pycache__/
+*.pkl

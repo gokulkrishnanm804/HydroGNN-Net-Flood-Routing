@@ -1,0 +1,416 @@
+# =============================================================================
+# HydroGNN-Net Research Pipeline Configuration
+# Cauvery Basin, Tamil Nadu, India
+# IEEE Final Year Project
+# =============================================================================
+# USAGE: All pipeline scripts read this file. Set credentials in .env or here.
+# Run order:
+#   python pipeline/download_all.py
+#   python pipeline/preprocess.py
+#   python pipeline/feature_engineering.py
+#   python pipeline/build_graph.py
+#   python pipeline/create_dataset.py
+#   python pipeline/train.py
+#   python pipeline/evaluate.py
+#   python pipeline/export_model.py
+
+project:
+  title: "HydroGNN-Net: Physics-Informed Spatio-Temporal GNN for Flood Forecasting"
+  version: "1.0.0"
+  citation: "Cauvery Basin Flood Forecasting, IEEE 2026"
+
+basin:
+  name: "Cauvery"
+  country: "India"
+  state: "Tamil Nadu"
+  # Bounding box: [lon_min, lat_min, lon_max, lat_max]
+  bbox: [75.0, 10.0, 80.5, 13.5]
+  area_km2: 81155
+  area_buffer_deg: 0.5  # Extra buffer added to bbox for downloads
+
+years:
+  start: 2018
+  end: 2023
+
+temporal:
+  resolution_minutes: 30       # Native GPM IMERG resolution
+  lookback_steps: 48           # 48 steps × 30 min = 24 h lookback
+  forecast_horizons_hours: [1, 3, 6, 12, 18, 24]
+  step_size: 1                 # Sliding window step (1 = dense windows)
+
+# ── River Monitoring Stations ─────────────────────────────────────────────────
+# Source: Central Water Commission (CWC) India
+# Manual data export from: https://indiawris.gov.in/wris/#/
+# Place exported CSV files in: dataset/raw/cwc/{station_id}_{YYYY}.csv
+stations:
+  - id: BILIGUNDLU
+    name: "Biligundlu - Cauvery"
+    lat: 12.433
+    lon: 77.417
+    danger_level_m: 15.2
+    warning_level_m: 12.0
+    basin_area_km2: 1200
+    district: "Krishnagiri"
+    cwc_gauge_id: "CR-BILI"
+    is_reservoir: false
+    river: "Cauvery"
+
+  - id: METTUR_DAM
+    name: "Mettur Dam - Cauvery"
+    lat: 11.785
+    lon: 77.800
+    danger_level_m: 120.0
+    warning_level_m: 96.0
+    basin_area_km2: 23000
+    district: "Salem"
+    cwc_gauge_id: "CR-MET"
+    is_reservoir: false
+    river: "Cauvery"
+
+  - id: ERODE
+    name: "Erode - Cauvery"
+    lat: 11.341
+    lon: 77.717
+    danger_level_m: 16.0
+    warning_level_m: 13.0
+    basin_area_km2: 12000
+    district: "Erode"
+    cwc_gauge_id: "CR-ERO"
+    is_reservoir: false
+    river: "Cauvery"
+
+  - id: KODUMUDI
+    name: "Kodumudi - Cauvery"
+    lat: 11.083
+    lon: 77.867
+    danger_level_m: 17.5
+    warning_level_m: 14.0
+    basin_area_km2: 18000
+    district: "Erode"
+    cwc_gauge_id: "CR-KOD"
+    is_reservoir: false
+    river: "Cauvery"
+
+  - id: KARUR
+    name: "Karur - Cauvery"
+    lat: 10.950
+    lon: 78.083
+    danger_level_m: 20.0
+    warning_level_m: 16.0
+    basin_area_km2: 25000
+    district: "Karur"
+    cwc_gauge_id: "CR-KAR"
+    is_reservoir: false
+    river: "Cauvery"
+
+  - id: MUSIRI
+    name: "Musiri - Cauvery"
+    lat: 10.933
+    lon: 78.450
+    danger_level_m: 18.0
+    warning_level_m: 14.5
+    basin_area_km2: 28000
+    district: "Tiruchirappalli"
+    cwc_gauge_id: "CR-MUS"
+    is_reservoir: false
+    river: "Cauvery"
+
+  - id: TRICHY_UPPER
+    name: "Trichy Upper Anaicut - Cauvery"
+    lat: 10.817
+    lon: 78.683
+    danger_level_m: 22.0
+    warning_level_m: 18.0
+    basin_area_km2: 35000
+    district: "Tiruchirappalli"
+    cwc_gauge_id: "CR-TRI"
+    is_reservoir: false
+    river: "Cauvery"
+
+  - id: GRAND_ANICUT
+    name: "Grand Anicut - Cauvery"
+    lat: 10.767
+    lon: 78.683
+    danger_level_m: 15.0
+    warning_level_m: 12.0
+    basin_area_km2: 36000
+    district: "Tiruchirappalli"
+    cwc_gauge_id: "CR-GAN"
+    is_reservoir: false
+    river: "Cauvery"
+
+# ── Reservoirs ────────────────────────────────────────────────────────────────
+# Source: CWC Reservoir Monitoring
+# Place exported CSV files in: dataset/raw/reservoir/{reservoir_id}_{YYYY}.csv
+reservoirs:
+  - id: METTUR
+    name: "Mettur Reservoir (Stanley)"
+    station_id: METTUR_DAM
+    capacity_tmc: 93.47
+    lat: 11.785
+    lon: 77.800
+    cwc_reservoir_id: "RES-MET"
+    river: "Cauvery"
+
+  - id: BHAVANISAGAR
+    name: "Bhavanisagar Reservoir"
+    station_id: ERODE
+    capacity_tmc: 32.80
+    lat: 11.467
+    lon: 77.183
+    cwc_reservoir_id: "RES-BHV"
+    river: "Bhavani"
+
+  - id: AMARAVATHI
+    name: "Amaravathi Dam"
+    station_id: KARUR
+    capacity_tmc: 30.20
+    lat: 10.633
+    lon: 77.633
+    cwc_reservoir_id: "RES-AMR"
+    river: "Amaravathi"
+
+  - id: UPPER_BHAVANI
+    name: "Upper Bhavani Reservoir"
+    station_id: ERODE
+    capacity_tmc: 12.00
+    lat: 11.617
+    lon: 76.983
+    cwc_reservoir_id: "RES-UBH"
+    river: "Bhavani"
+
+  - id: PILLUR
+    name: "Pillur Dam"
+    station_id: ERODE
+    capacity_tmc: 3.30
+    lat: 11.333
+    lon: 76.950
+    cwc_reservoir_id: "RES-PIL"
+    river: "Bhavani"
+
+# ── File Paths (relative to pipeline/) ───────────────────────────────────────
+paths:
+  raw_dir:          "dataset/raw"
+  processed_dir:    "dataset/processed"
+  graphs_dir:       "dataset/graphs"
+  features_dir:     "dataset/features"
+  splits_dir:       "dataset/splits"
+  models_dir:       "dataset/models"
+  logs_dir:         "dataset/logs"
+  metadata_dir:     "dataset/metadata"
+  checkpoints_dir:  "dataset/models/checkpoints"
+
+# ── Credentials ───────────────────────────────────────────────────────────────
+# Leave blank here; set via environment variables in project root .env file
+# NASA Earthdata: https://urs.earthdata.nasa.gov (free registration)
+# Copernicus CDS: https://cds.climate.copernicus.eu (free registration)
+credentials:
+  earthdata_username: ""   # Or set env: NASA_EARTHDATA_USERNAME
+  earthdata_password: ""   # Or set env: NASA_EARTHDATA_PASSWORD
+  cds_api_file: "~/.cdsapirc"
+
+# ── Download Settings ─────────────────────────────────────────────────────────
+download:
+  max_parallel: 4
+  retry_attempts: 5
+  retry_delay_sec: 2        # Low: first 401 on NASA GES DISC is a cookie-warm redirect
+  retry_backoff: 2.0        # exponential multiplier per retry
+  chunk_size_bytes: 1048576 # 1 MB streaming chunks
+  timeout_sec: 300
+  rate_limit_delay_sec: 1.0
+
+# ── NASA GPM IMERG ────────────────────────────────────────────────────────────
+# Product: GPM 3IMERGHH V07 (Half-Hourly Final Run)
+# Resolution: 0.1 degree × 30 minutes
+# Reference: Huffman et al. (2020) IMERG ATBD V06
+# Access: https://gpm1.gesdisc.eosdis.nasa.gov/data/GPM_L3/GPM_3IMERGHH.07/
+gpm:
+  product: "GPM_3IMERGHH"
+  version: "07"
+  variable: "precipitationCal"
+  base_url: "https://gpm1.gesdisc.eosdis.nasa.gov/data/GPM_L3/GPM_3IMERGHH.07"
+  resolution_minutes: 30
+  grid_resolution_deg: 0.1
+  # ── Performance (producer-consumer optimized downloader) ───────────────
+  workers: 4              # parallel download threads (NASA allows up to 6)
+  batch_size: 100         # flush Parquet every N extracted slots
+  retries: 5              # max retries per file (exponential backoff: 1→2→4→8→16s)
+  timeout: 60             # HTTP request timeout in seconds
+  queue_size: 50          # bounded queue between download pool and extraction worker
+  resume: true            # never restart from scratch; use download_state.json
+  delete_after_extract: true  # delete HDF5 immediately after extraction
+
+# ── ERA5 (Copernicus) ─────────────────────────────────────────────────────────
+# Product: ERA5 Hourly Reanalysis on Single Levels
+# Reference: Hersbach et al. (2020). ERA5 global reanalysis. QJRMS.
+# Access: https://cds.climate.copernicus.eu
+era5:
+  variables:
+    - 2m_temperature
+    - 2m_dewpoint_temperature
+    - 10m_u_component_of_wind
+    - 10m_v_component_of_wind
+    - surface_pressure
+    - evaporation                    # ERA5 short name: e  (total_evaporation is ambiguous on CDS v2)
+    - volumetric_soil_water_layer_1
+  product_type: reanalysis
+  grid_resolution: 0.25
+  data_format: netcdf              # CDS API v2: 'format' key is deprecated
+
+# ── HydroRIVERS ──────────────────────────────────────────────────────────────
+# Reference: Lehner, B. & Grill G. (2013) HydroRIVERS. Hydrological Processes.
+# Download: https://www.hydrosheds.org/products/hydrorivers
+hydrorivers:
+  url: "https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_as_shp.zip"
+  region: "as"
+  min_strahler_order: 3
+
+# ── SRTM DEM ─────────────────────────────────────────────────────────────────
+# Reference: Farr et al. (2007) SRTM. Reviews of Geophysics.
+srtm:
+  resolution_m: 30
+  product: "SRTM1"
+
+# ── Preprocessing ─────────────────────────────────────────────────────────────
+preprocessing:
+  max_gap_fill_hours: 6        # Maximum gap to fill via interpolation
+  min_valid_pct: 70            # Minimum % valid data required per station
+  missing_threshold_critical: 0.30
+  missing_threshold_warning:  0.10
+
+# ── Feature Engineering ───────────────────────────────────────────────────────
+features:
+  rolling_windows_hours: [1, 3, 6, 12, 24]
+  ari_decay: 0.9               # Antecedent Rainfall Index decay
+  upstream_tau_hours: 12       # Upstream contribution e-folding time
+  normalization: "robust"      # robust | standard | minmax
+  # Final 13-element feature vector per node per timestep:
+  feature_names:
+    # NOTE: rainfall_*h features are now derived from IMD Daily Rainfall (not GPM)
+    - rainfall_1h
+    - rainfall_3h
+    - rainfall_6h
+    - rainfall_12h
+    - rainfall_24h
+    - antecedent_rainfall_index
+    - temperature_c
+    - soil_moisture
+    - wind_speed_ms
+    - reservoir_release_norm
+    - reservoir_storage_norm
+    - upstream_contribution
+    - water_level_m
+
+# ── Graph Construction ────────────────────────────────────────────────────────
+graph:
+  default_velocity_kmh: 3.0   # River flow velocity for travel time estimation
+  n_edge_features: 4
+  n_node_features: 13
+  edge_features:
+    - length_km
+    - elev_diff_m
+    - travel_time_h
+    - strahler_order
+
+# ── Model Architecture ────────────────────────────────────────────────────────
+# HydroGNN-Net: GRU → GATv2 → GraphSAGE → Multi-Horizon Head
+model:
+  node_features: 13
+  hidden_dim: 128
+  gru_layers: 2
+  gat_heads: 4
+  gat_layers: 2
+  sage_hidden: 128
+  edge_dim: 4
+  dropout: 0.2
+  horizons: [1, 3, 6, 12, 18, 24]
+
+# ── Training ──────────────────────────────────────────────────────────────────
+training:
+  epochs: 200
+  batch_size: 16
+  lr: 0.001
+  weight_decay: 0.0001
+  patience: 15
+  min_delta: 0.001             # Minimum NSE improvement to reset patience
+  scheduler: cosine
+  scheduler_T_max: 100
+  mse_weight: 1.0
+  nse_weight: 0.3
+  physics_weight: 0.1
+  grad_clip: 1.0
+  seed: 42
+  device: auto                 # auto | cuda | cpu
+
+# ── Split ─────────────────────────────────────────────────────────────────────
+split:
+  train: 0.70
+  val:   0.15
+  test:  0.15
+
+# ── Evaluation ────────────────────────────────────────────────────────────────
+evaluation:
+  metrics: [nse, kge, rmse, mae, pbias, csi, pod, far]
+  flood_threshold_ratio: 0.8
+  mc_dropout_samples: 20
+
+# ── Export ────────────────────────────────────────────────────────────────────
+export:
+  onnx: true
+  opset_version: 14
+  quantize: false
+
+# ── IMD Rainfall ──────────────────────────────────────────────────────────────
+# Official rainfall source: IMD Gridded Daily Rainfall (0.25° resolution)
+# Replaced NASA GPM IMERG as of 2026-07-16 cleanup.
+# Source: India Meteorological Department (IMD)
+# Files: RF25_ind{YYYY}_rfp25.nc (2018–2023)
+# Variable: RAINFALL (mm/day), grid: 129×135, 0.25° spacing
+# Reference: Pai et al. (2014) IMD gridded daily rainfall over India.
+imd_rainfall:
+  source: "IMD"
+  path: "dataset/raw/rainfall"
+  file_pattern: "RF25_ind{year}_rfp25.nc"
+  variable: "RAINFALL"
+  units: "mm/day"
+  resolution_deg: 0.25
+  years: [2018, 2019, 2020, 2021, 2022, 2023]
+  lat_range: [10.0, 13.5]    # Cauvery basin extent
+  lon_range: [75.0, 80.5]    # Cauvery basin extent
+  note: "GPM IMERG has been RETIRED from this project. Use IMD only."
+
+# ── Reservoir Operations ──────────────────────────────────────────────────────
+# Source: TN AgrISNET Reservoir API (tnagrisnet.tn.gov.in)
+# File: dataset/raw/reservoir/reservoir_2018_2023.csv
+# Note: UPPER_BHAVANI and PILLUR are NOT in the API dataset.
+#       Removed from active reservoir list. Using available proxies.
+reservoir_operations:
+  source: "TN_AgrISNET"
+  path: "dataset/raw/reservoir/reservoir_2018_2023.csv"
+  date_col: "updated_date"
+  date_filter_end: "2023-12-31"
+  reservoirs:
+    - name: "METTUR"
+      cwc_name: "METTUR"
+      pipeline_id: "METTUR_DAM"
+    - name: "BHAVANISAGAR"
+      cwc_name: "BHAVANISAGAR"
+      pipeline_id: "BHAVANISAGAR"
+    - name: "AMARAVATHI"
+      cwc_name: "AMARAVATHI*"
+      pipeline_id: "AMARAVATHI"
+    - name: "HARANGI"
+      cwc_name: "Harangi"
+      pipeline_id: "HARANGI"
+    - name: "KRS"
+      cwc_name: "Krishna Raja Sagar"
+      pipeline_id: "KRS"
+    - name: "KABINI"
+      cwc_name: "Kabini"
+      pipeline_id: "KABINI"
+    - name: "HEMAVATHY"
+      cwc_name: "Hemavathy"
+      pipeline_id: "HEMAVATHY"
+  # RETIRED reservoirs (not in dataset):
+  # - UPPER_BHAVANI: absent from API, removed 2026-07-16
+  # - PILLUR: absent from API, removed 2026-07-16

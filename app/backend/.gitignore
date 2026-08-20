@@ -1,0 +1,121 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Raw datasets
+pipeline/dataset/raw/
+
+# Dataset archives
+pipeline/archive/
+
+# Processed datasets
+processed_dataset/
+
+
+# Large model/data files
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Large geospatial files
+*.tif
+*.tiff
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.zip
+
+# C extensions
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs
+logs/
+*.log
+
+# ── HydroGNN-Net Dataset & Generated Files ────────────────────────────────────
+
+# Processed datasets
+processed_dataset/
+datasets/processed/
+
+# Raw pipeline datasets
+pipeline/dataset/raw/
+
+# Generated/processed pipeline data
+pipeline/dataset/processed/
+pipeline/dataset/processed_test/
+pipeline/dataset/graphs/
+pipeline/dataset/models/
+
+# Large scientific data files
+*.nc
+*.tif
+*.tiff
+*.parquet
+*.npy
+*.npz
+
+# GIS / shapefile data
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.sbn
+*.sbx
+*.zip
+
+# ── Trained Models / Checkpoints ─────────────────────────────────────────────
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+
+# ── Generated State / Cache ──────────────────────────────────────────────────
+download_state.json
+__pycache__/
+*.pkl
