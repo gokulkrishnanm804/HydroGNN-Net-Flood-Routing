@@ -250,16 +250,18 @@ class CWCDataParser:
 
         out["quality_flag"] = 0
 
-        # Validation
-        bad_level = out["level_m"] <= 0
+        # Validation: physical plausibility (Cauvery basin levels: -1.0m to 50.0m)
+        bad_level = (out["level_m"] < -1.0) | (out["level_m"] > 50.0)
         bad_disch = out["discharge_cumecs"] < 0
         n_bad = bad_level.sum() + bad_disch.sum()
         if n_bad > 0:
             logger.warning(
                 f"{station_id}/{csv_path.name}: {n_bad} suspect values "
-                f"(level<=0: {bad_level.sum()}, discharge<0: {bad_disch.sum()}) — flagged"
+                f"(level out of [-1.0, 50.0]m: {bad_level.sum()}, discharge<0: {bad_disch.sum()}) — set to NaN"
             )
             out.loc[bad_level | bad_disch, "quality_flag"] = 1
+            out.loc[bad_level, "level_m"] = np.nan
+            out.loc[bad_disch, "discharge_cumecs"] = np.nan
 
         out = out.set_index("timestamp").sort_index()
         return out
@@ -371,9 +373,11 @@ class CWCDataParser:
                             }).dropna(subset=["timestamp"])
 
                             parsed_comb["quality_flag"] = 0
-                            bad_level = parsed_comb["level_m"] <= 0
+                            bad_level = (parsed_comb["level_m"] < -1.0) | (parsed_comb["level_m"] > 50.0)
                             bad_disch = parsed_comb["discharge_cumecs"] < 0
                             parsed_comb.loc[bad_level | bad_disch, "quality_flag"] = 1
+                            parsed_comb.loc[bad_level, "level_m"] = np.nan
+                            parsed_comb.loc[bad_disch, "discharge_cumecs"] = np.nan
 
                             parsed_comb = parsed_comb.set_index("timestamp").sort_index()
                             yr_dfs.append(parsed_comb)

@@ -75,8 +75,8 @@ def train_epoch(
 
         pred, log_var = model(batch.x, batch.edge_index, batch.edge_attr)
 
-        # Mask: only compute loss where we have observed targets
-        mask = batch.mask if hasattr(batch, "mask") else None
+        # Mask: use y_mask (where targets are valid); fall back to no mask
+        mask = batch.y_mask if hasattr(batch, "y_mask") else None
         loss = criterion(pred, batch.y, log_var=log_var, mask=mask)
 
         loss.backward()
@@ -100,24 +100,29 @@ def evaluate(
 ) -> dict:
     """Evaluate model on a DataLoader. Returns metric dict."""
     model.eval()
-    all_pred, all_true = [], []
+    all_pred, all_true, all_mask = [], [], []
     total_loss = 0.0
     n_batches  = 0
 
     for batch in loader:
         batch = batch.to(device)
         pred, log_var = model(batch.x, batch.edge_index, batch.edge_attr)
-        mask = batch.mask if hasattr(batch, "mask") else None
+        mask = batch.y_mask if hasattr(batch, "y_mask") else None
         loss = criterion(pred, batch.y, log_var=log_var, mask=mask)
         total_loss += loss.item()
         n_batches  += 1
 
-        # Collect 1h horizon predictions for NSE computation
-        all_pred.append(pred[:, 0].cpu().numpy())   # 1-hour horizon
+        # Collect 6h horizon predictions for NSE computation (horizons=[6,12,24])
+        all_pred.append(pred[:, 0].cpu().numpy())   # 6-hour horizon
         all_true.append(batch.y[:, 0].cpu().numpy())
+        if hasattr(batch, "y_mask"):
+            all_mask.append(batch.y_mask[:, 0].cpu().numpy())
+        else:
+            all_mask.append(np.ones(batch.y.size(0), dtype=bool))
 
     pred_arr = np.concatenate(all_pred)
     true_arr = np.concatenate(all_true)
+    mask_arr = np.concatenate(all_mask).astype(bool)
 
     # Inverse-normalise if scaler available
     if normalizer is not None:
@@ -125,7 +130,7 @@ def evaluate(
         true_arr = normalizer.inverse_transform_column(target_col, true_arr)
 
     # Filter NaN
-    valid = np.isfinite(pred_arr) & np.isfinite(true_arr)
+    valid = mask_arr & np.isfinite(pred_arr) & np.isfinite(true_arr)
     p, t  = pred_arr[valid], true_arr[valid]
 
     return {
@@ -234,7 +239,7 @@ def main() -> None:
 
     # ── Dataset ───────────────────────────────────────────────────────────
     splits_dir = Path(config["paths"]["splits_dir"])
-    root_dir   = splits_dir.parent
+    root_dir   = splits_dir
 
     log_separator(logger, "Loading Datasets")
     try:

@@ -194,7 +194,7 @@ paths:
   processed_dir:    "dataset/processed"
   graphs_dir:       "dataset/graphs"
   features_dir:     "dataset/features"
-  splits_dir:       "dataset/splits"
+  splits_dir:       "../HydroGNN_Datasets/pytorch"
   models_dir:       "dataset/models"
   logs_dir:         "dataset/logs"
   metadata_dir:     "dataset/metadata"
@@ -315,15 +315,15 @@ graph:
 # ── Model Architecture ────────────────────────────────────────────────────────
 # HydroGNN-Net: GRU → GATv2 → GraphSAGE → Multi-Horizon Head
 model:
-  node_features: 13
+  node_features: 7
   hidden_dim: 128
   gru_layers: 2
   gat_heads: 4
   gat_layers: 2
   sage_hidden: 128
-  edge_dim: 4
+  edge_dim: 3
   dropout: 0.2
-  horizons: [1, 3, 6, 12, 18, 24]
+  horizons: [6, 12, 24]
 
 # ── Training ──────────────────────────────────────────────────────────────────
 training:

@@ -38,11 +38,11 @@ from src.dataset.hydro_dataset import HydroGNNDataset
 from src.model.hydrognn_net import HydroGNNNet
 from src.utils.logger import get_logger, log_separator
 from src.utils.metrics import (
-    nash_sutcliffe_efficiency,
-    kling_gupta_efficiency,
-    root_mean_square_error,
-    mean_absolute_error as hydro_mae,
-    percent_bias,
+    nash_sutcliffe,
+    kling_gupta,
+    rmse,
+    mae,
+    pbias,
 )
 from torch_geometric.loader import DataLoader
 
@@ -106,18 +106,24 @@ def evaluate_model(model, loader, device, n_nodes):
     preds_l, targets_l, masks_l = [], [], []
     for batch in loader:
         batch  = batch.to(device)
-        out    = model(batch)
-        pred   = out["pred"].cpu().numpy()        # [B*N, H]
-        target = batch.y.cpu().numpy()            # [B*N, H]
-        n_per  = batch.num_graphs
-        n      = pred.shape[0] // n_per if n_per > 0 else n_nodes
-        H      = pred.shape[1]
-        preds_l.append(pred.reshape(n_per, n, H))
-        targets_l.append(target.reshape(n_per, n, H))
-        if hasattr(batch, "mask") and batch.mask is not None:
-            masks_l.append(batch.mask.cpu().numpy().reshape(n_per, n))
+        pred, log_var = model(batch.x, batch.edge_index, batch.edge_attr)
+        pred_np   = pred.cpu().numpy()        # [B*N, H]
+        target_np = batch.y.cpu().numpy()    # [B*N, H]
+        n_per  = batch.num_graphs if hasattr(batch, "num_graphs") else batch.batch.max().item() + 1
+        n      = pred_np.shape[0] // n_per if n_per > 0 else n_nodes
+        H      = pred_np.shape[1]
+        preds_l.append(pred_np.reshape(n_per, n, H))
+        targets_l.append(target_np.reshape(n_per, n, H))
+        if hasattr(batch, "y_mask") and batch.y_mask is not None:
+            masks_l.append(batch.y_mask.cpu().numpy().reshape(n_per, n, H))
+        elif hasattr(batch, "mask") and batch.mask is not None:
+            mask_data = batch.mask.cpu().numpy()
+            if mask_data.ndim == 1:
+                masks_l.append(np.repeat(mask_data.reshape(n_per, n)[:, :, np.newaxis], H, axis=2))
+            else:
+                masks_l.append(mask_data.reshape(n_per, n, H))
         else:
-            masks_l.append(np.ones((n_per, n), dtype=bool))
+            masks_l.append(np.ones((n_per, n, H), dtype=bool))
     if not preds_l:
         logger.error("No predictions — test dataset is empty.")
         sys.exit(1)
@@ -140,11 +146,14 @@ def compute_metrics(preds, targets, masks, horizons_h, station_ids,
     all_obs, all_pred = [], []
 
     for n_idx, sid in enumerate(station_ids):
-        node_mask = masks[:, n_idx]
         results["per_station"][sid] = {}
         for h_idx, h in enumerate(horizons_h):
             obs_raw  = targets[:, n_idx, h_idx]
             pred_raw = preds[:,   n_idx, h_idx]
+            if masks.ndim == 3:
+                node_mask = masks[:, n_idx, h_idx]
+            else:
+                node_mask = masks[:, n_idx]
             valid = node_mask & np.isfinite(obs_raw) & np.isfinite(pred_raw)
             if valid.sum() < 10:
                 logger.warning(f"Station {sid} H+{h}h: only {valid.sum()} valid samples. Skipping.")
@@ -153,16 +162,16 @@ def compute_metrics(preds, targets, masks, horizons_h, station_ids,
             pred = pred_raw[valid]
             all_obs.extend(obs.tolist())
             all_pred.extend(pred.tolist())
-            if danger_levels is not None and n_idx < len(danger_levels):
+            if danger_levels is not None and n_idx < len(danger_levels) and danger_levels[n_idx] is not None:
                 fthr = danger_levels[n_idx] * flood_threshold_ratio
             else:
                 fthr = float(np.quantile(obs, 0.95))
             m = {
-                "nse":   float(nash_sutcliffe_efficiency(obs, pred)),
-                "kge":   float(kling_gupta_efficiency(obs, pred)),
-                "rmse":  float(root_mean_square_error(obs, pred)),
-                "mae":   float(hydro_mae(obs, pred)),
-                "pbias": float(percent_bias(obs, pred)),
+                "nse":   float(nash_sutcliffe(obs, pred)),
+                "kge":   float(kling_gupta(obs, pred)),
+                "rmse":  float(rmse(obs, pred)),
+                "mae":   float(mae(obs, pred)),
+                "pbias": float(pbias(obs, pred)),
                 "n_valid": int(valid.sum()),
             }
             m.update(_binary_flood_metrics(obs, pred, threshold=fthr))
@@ -172,17 +181,21 @@ def compute_metrics(preds, targets, masks, horizons_h, station_ids,
     for h_idx, h in enumerate(horizons_h):
         h_obs, h_pred = [], []
         for n_idx in range(N):
-            valid = masks[:, n_idx] & np.isfinite(targets[:, n_idx, h_idx]) & np.isfinite(preds[:, n_idx, h_idx])
+            if masks.ndim == 3:
+                node_mask = masks[:, n_idx, h_idx]
+            else:
+                node_mask = masks[:, n_idx]
+            valid = node_mask & np.isfinite(targets[:, n_idx, h_idx]) & np.isfinite(preds[:, n_idx, h_idx])
             h_obs.extend(targets[valid, n_idx, h_idx].tolist())
             h_pred.extend(preds[valid, n_idx, h_idx].tolist())
         if len(h_obs) >= 10:
             o, p = np.array(h_obs), np.array(h_pred)
             results["per_horizon"][f"H+{h}h"] = {
-                "nse":   float(nash_sutcliffe_efficiency(o, p)),
-                "kge":   float(kling_gupta_efficiency(o, p)),
-                "rmse":  float(root_mean_square_error(o, p)),
-                "mae":   float(hydro_mae(o, p)),
-                "pbias": float(percent_bias(o, p)),
+                "nse":   float(nash_sutcliffe(o, p)),
+                "kge":   float(kling_gupta(o, p)),
+                "rmse":  float(rmse(o, p)),
+                "mae":   float(mae(o, p)),
+                "pbias": float(pbias(o, p)),
                 "n_valid": len(h_obs),
             }
 
@@ -190,11 +203,11 @@ def compute_metrics(preds, targets, masks, horizons_h, station_ids,
     if len(all_obs) >= 10:
         o, p = np.array(all_obs), np.array(all_pred)
         results["global"] = {
-            "nse":   float(nash_sutcliffe_efficiency(o, p)),
-            "kge":   float(kling_gupta_efficiency(o, p)),
-            "rmse":  float(root_mean_square_error(o, p)),
-            "mae":   float(hydro_mae(o, p)),
-            "pbias": float(percent_bias(o, p)),
+            "nse":   float(nash_sutcliffe(o, p)),
+            "kge":   float(kling_gupta(o, p)),
+            "rmse":  float(rmse(o, p)),
+            "mae":   float(mae(o, p)),
+            "pbias": float(pbias(o, p)),
             "n_valid": len(all_obs),
         }
     else:
@@ -298,27 +311,16 @@ def main() -> None:
         sys.exit(1)
 
     model_cfg = config["model"]
-    model = HydroGNNNet(
-        node_features = model_cfg["node_features"],
-        hidden_dim    = model_cfg["hidden_dim"],
-        gru_layers    = model_cfg["gru_layers"],
-        gat_heads     = model_cfg["gat_heads"],
-        gat_layers    = model_cfg["gat_layers"],
-        sage_hidden   = model_cfg["sage_hidden"],
-        edge_dim      = model_cfg["edge_dim"],
-        dropout       = model_cfg["dropout"],
-        horizons      = model_cfg["horizons"],
-    ).to(device)
+    model = HydroGNNNet.from_config(model_cfg).to(device)
 
     ckpt  = torch.load(ckpt_path, map_location=device, weights_only=False)
-    state = ckpt.get("model_state_dict", ckpt)
+    state = ckpt.get("model_state", ckpt.get("model_state_dict", ckpt))
     model.load_state_dict(state)
     model.eval()
     logger.info(f"Checkpoint loaded: {ckpt_path}")
 
     # Dataset
-    splits_root = splits_dir.parent
-    test_ds = HydroGNNDataset(root=str(splits_root), split="test")
+    test_ds = HydroGNNDataset(root=str(splits_dir), split="test")
     bs = args.batch_size or config["training"]["batch_size"]
     loader = DataLoader(test_ds, batch_size=bs, shuffle=False, num_workers=0)
 
@@ -350,7 +352,11 @@ def main() -> None:
     rows = []
     for n_idx, sid in enumerate(station_ids):
         for t_idx in range(T):
-            if not masks[t_idx, n_idx]:
+            if masks.ndim == 3:
+                node_valid = masks[t_idx, n_idx, :]
+            else:
+                node_valid = [masks[t_idx, n_idx]] * H
+            if not any(node_valid):
                 continue
             row = {"station_id": sid, "window_idx": t_idx}
             for h_idx, h in enumerate(horizons_h):
