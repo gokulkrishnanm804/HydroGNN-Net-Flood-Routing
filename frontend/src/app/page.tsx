@@ -30,7 +30,7 @@ const ChartTooltip = ({ active, payload, label }: any) => {
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color, display: 'flex', justifyContent: 'space-between', gap: 16, margin: 0 }}>
           <span>{p.name}</span>
-          <strong>{typeof p.value === 'number' ? p.value.toFixed(2) : p.value}</strong>
+          <strong>{typeof p.value === 'number' ? (p.dataKey === 'rainfall' ? `${p.value.toFixed(2)} mm` : `${p.value.toFixed(2)} ft`) : p.value}</strong>
         </p>
       ))}
     </div>
@@ -214,7 +214,7 @@ function StationMiniCard({ station, delay, isSelected, onClick }: { station: any
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
           <span style={{ fontSize: '0.62rem', color: sc.color, fontWeight: 600 }}>{pct.toFixed(0)}% threshold</span>
-          <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.25)' }}>NSE 0.880</span>
+          <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)' }}>Exp 9 Forecast</span>
         </div>
       </motion.div>
     </motion.div>
@@ -260,7 +260,7 @@ function ReservoirGauge({ reservoir, delay }: { reservoir: any; delay: number })
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.88)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{reservoir.name}</div>
           <span style={{ fontSize: '0.58rem', padding: '1px 6px', borderRadius: 4, background: reservoir.data_source === 'live_api' ? 'rgba(16,185,129,0.15)' : 'rgba(6,182,212,0.15)', color: reservoir.data_source === 'live_api' ? '#34d399' : '#22d3ee', border: `1px solid ${reservoir.data_source === 'live_api' ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.3)'}` }}>
-            {reservoir.data_source === 'live_api' ? 'LIVE API' : 'MODEL DERIVED'}
+            {reservoir.data_source === 'live_api' ? 'LIVE API' : 'HYDROLOGICAL MODEL'}
           </span>
         </div>
         <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
@@ -409,16 +409,16 @@ export default function DashboardPage() {
             sparkVolatility={0.12}
           />
           <KPICard
-            title="Model Accuracy" value={88.0} decimals={1} unit="%" accent="#34d399"
+            title="Test NSE" value={0.9968} decimals={4} accent="#34d399"
             icon={<Brain size={17} color="#34d399" />} delay={3}
-            change={1.2} changeLabel="vs baseline" lastUpdated="Diagnostics"
-            sparkVolatility={0.04}
+            changeLabel="Offline test" lastUpdated="Held-out eval"
+            sparkVolatility={0.02}
           />
           <KPICard
-            title="Avg NSE Score" value={89.1} decimals={1} unit="%" accent="#06b6d4"
+            title="Test RMSE" value={0.497} decimals={3} unit="m" accent="#06b6d4"
             icon={<Activity size={17} color="#06b6d4" />} delay={4}
-            change={0.8} changeLabel="vs last run" lastUpdated="Diagnostics"
-            sparkVolatility={0.03}
+            changeLabel="Offline test" lastUpdated="Held-out eval"
+            sparkVolatility={0.02}
           />
         </div>
 
@@ -443,7 +443,7 @@ export default function DashboardPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
                   <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Water Level — {activeStationDetails?.name || 'Loading'}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Observed 24h timeline convolved with 24h GNN predictions</div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Observed 24h timeline (Live) convolved with 24h Experiment 9 GNN predictions</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {['12h', '24h', '48h'].map((l, i) => (
@@ -473,12 +473,12 @@ export default function DashboardPage() {
                   <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} />
                   <Tooltip content={<ChartTooltip />} />
                   <ReferenceLine y={activeStationDetails?.danger_level || 50} stroke="#fb7185" strokeDasharray="5 4" strokeWidth={1.5}
-                    label={{ value: 'Danger', position: 'right', fontSize: 9, fill: '#fb7185' }} />
+                    label={{ value: `Danger (${(activeStationDetails?.danger_level || 50).toFixed(1)}ft)`, position: 'right', fontSize: 9, fill: '#fb7185' }} />
                   <Area type="monotone" dataKey="level" stroke="#22d3ee" strokeWidth={2.5}
-                    fill="url(#areaGrad)" dot={false} name="Water Level (m)"
+                    fill="url(#areaGrad)" dot={false} name="Observed Level (ft) — Live"
                     animationDuration={1800} animationEasing="ease-out" />
                   <Area type="monotone" dataKey="forecast" stroke="#a78bfa" strokeWidth={2}
-                    fill="url(#areaGradForecast)" dot={false} name="AI Forecast (m)"
+                    fill="url(#areaGradForecast)" dot={false} name="AI Forecast (ft) — Exp 9"
                     strokeDasharray="6 3" animationDuration={2000} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -494,7 +494,7 @@ export default function DashboardPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
                 <div>
                   <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Basin Precipitation — {activeStationDetails?.name || 'Loading'}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Cumulative 15-minute observations from OpenWeather/NASA APIs</div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Cumulative 15-minute observations (Live Ingested)</div>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={180}>
@@ -546,7 +546,7 @@ export default function DashboardPage() {
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Reservoir Storage</div>
-                <span className="badge badge-info" style={{ fontSize: '0.62rem' }}>Live</span>
+                <span className="badge badge-info" style={{ fontSize: '0.62rem' }}>Hydrological Model</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {reservoirs.slice(0, 5).map((r: any, i: number) => <ReservoirGauge key={r.id} reservoir={r} delay={0.6 + i * 0.08} />)}

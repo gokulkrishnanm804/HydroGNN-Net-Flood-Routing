@@ -201,7 +201,7 @@ export default function PipelinePage() {
               </div>
               <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8 }}>
                 <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>Validation metrics</div>
-                <div style={{ fontSize: '0.82rem', color: '#22d3ee', fontWeight: 600, marginTop: 2 }}>{diagnostics.model_drift.split('|')[1] || 'Val NSE=0.880 | Val RMSE=0.090 m'}</div>
+                <div style={{ fontSize: '0.82rem', color: '#22d3ee', fontWeight: 600, marginTop: 2 }}>{diagnostics.model_drift.split('|')[1] || 'Test NSE=0.9968 | Test RMSE=0.497 m'}</div>
               </div>
               <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8 }}>
                 <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>Telemetry data drift quality</div>

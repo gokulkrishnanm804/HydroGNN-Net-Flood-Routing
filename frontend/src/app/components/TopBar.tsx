@@ -9,7 +9,7 @@ const BREADCRUMBS: Record<string, { label: string; sub: string }> = {
   '/':         { label: 'Dashboard',      sub: 'Overview · Real-time monitoring' },
   '/map':      { label: 'Basin Map',      sub: 'Cauvery Basin · Interactive monitoring' },
   '/forecast': { label: 'Flood Forecast', sub: 'AI multi-horizon prediction · GNN ensemble' },
-  '/stations': { label: 'Stations',       sub: '8 active CWC gauging stations' },
+  '/stations': { label: 'Stations',       sub: '8 active river gauging stations' },
   '/routing':  { label: 'Flood Routing',  sub: 'Downstream propagation · Animated path' },
   '/model':    { label: 'AI Model',       sub: 'HydroGNN-Net v2.4 · GRU → GATv2 → GraphSAGE' },
   '/alerts':   { label: 'Alert Center',   sub: 'Warning management · Active incidents' },

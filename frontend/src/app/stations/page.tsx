@@ -191,7 +191,7 @@ export default function StationsPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
               {[
                 { label: 'Flood Risk', value: `${selected.flood_probability || 0}%`, color: (selected.flood_probability || 0) > 60 ? '#fb7185' : (selected.flood_probability || 0) > 30 ? '#fb923c' : '#34d399' },
-                { label: 'NSE Accuracy', value: '0.880', color: '#22d3ee' },
+                { label: 'Forecast Engine', value: 'Exp 9 GNN', color: '#22d3ee' },
                 { label: 'Discharge Flow', value: `${selected.discharge.toFixed(1)} m³/s`, color: '#e2e8f0' },
                 { label: 'Warning level', value: selected.warning_level != null ? `${selected.warning_level.toFixed(1)}ft` : 'N/A', color: sc.color },
               ].map(m => (
@@ -230,7 +230,7 @@ export default function StationsPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>AI Forecaster Hydrograph</div>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Observed water level convolved with GNN 24h prediction interval</div>
+                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Observed water level (Live) convolved with Experiment 9 24h prediction interval</div>
               </div>
             </div>
 
@@ -251,9 +251,9 @@ export default function StationsPage() {
                 <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} />
                 <Tooltip content={<CustomTooltip />} />
                 <ReferenceLine y={selected.danger_level} stroke="#fb7185" strokeDasharray="5 4" strokeWidth={1.5}
-                  label={{ value: 'Danger Threshold', position: 'right', fontSize: 9, fill: '#fb7185' }} />
-                <Area type="monotone" dataKey="level" stroke="#22d3ee" strokeWidth={2} fill="url(#actualGrad)" name="Observed (ft)" dot={false} />
-                <Area type="monotone" dataKey="forecast" stroke="#a78bfa" strokeWidth={1.8} fill="url(#forecastGrad)" name="AI Forecast (ft)" strokeDasharray="5 3" dot={false} />
+                  label={{ value: `Danger (${selected.danger_level.toFixed(1)}ft)`, position: 'right', fontSize: 9, fill: '#fb7185' }} />
+                <Area type="monotone" dataKey="level" stroke="#22d3ee" strokeWidth={2} fill="url(#actualGrad)" name="Observed Level (ft) — Live" dot={false} />
+                <Area type="monotone" dataKey="forecast" stroke="#a78bfa" strokeWidth={1.8} fill="url(#forecastGrad)" name="AI Forecast (ft) — Exp 9" strokeDasharray="5 3" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </motion.div>

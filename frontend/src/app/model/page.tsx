@@ -13,12 +13,12 @@ const trainingData = Array.from({ length: MODEL_METRICS.training_epochs }, (_, i
 })).filter((_, i) => i % 3 === 0);
 
 const radarData = [
-  { metric: 'NSE',      A: 89.1, fullMark: 100 },
-  { metric: 'KGE',      A: 87.3, fullMark: 100 },
-  { metric: 'POD',      A: 84.0, fullMark: 100 },
-  { metric: 'CSI',      A: 78.0, fullMark: 100 },
-  { metric: 'Accuracy', A: 88.0, fullMark: 100 },
-  { metric: '1-FAR',    A: 88.0, fullMark: 100 },
+  { metric: 'Test NSE', A: 99.68, fullMark: 100 },
+  { metric: 'KGE',      A: 87.3,  fullMark: 100 },
+  { metric: 'POD',      A: 84.0,  fullMark: 100 },
+  { metric: 'CSI',      A: 78.0,  fullMark: 100 },
+  { metric: '1-MAE',    A: 82.1,  fullMark: 100 },
+  { metric: '1-FAR',    A: 88.0,  fullMark: 100 },
 ];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -33,11 +33,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 function ArchDiagram() {
   const layers = [
-    { name: 'Input', desc: '13 features × 8 stations', color: '#22d3ee', icon: '→' },
-    { name: 'GRU Encoder', desc: '2 layers, hidden=128', color: '#06b6d4', icon: '⟳' },
+    { name: 'Input', desc: '7 features × 8 stations', color: '#22d3ee', icon: '→' },
+    { name: 'GRU Encoder', desc: '2 layers, hidden=64', color: '#06b6d4', icon: '⟳' },
     { name: 'GATv2 Layer', desc: '4 heads, 2 layers', color: '#8b5cf6', icon: '⊗' },
-    { name: 'GraphSAGE', desc: 'Neighbor aggregation', color: '#a78bfa', icon: '◎' },
-    { name: 'Multi-Head Output', desc: '6 horizons: 1,3,6,12,18,24h', color: '#34d399', icon: '↗' },
+    { name: 'GraphSAGE', desc: 'hidden=64, neighbor aggregation', color: '#a78bfa', icon: '◎' },
+    { name: 'Output Head', desc: 'Native 6, 12, 24h (PCHIP for 1, 3, 18h)', color: '#34d399', icon: '↗' },
   ];
 
   return (

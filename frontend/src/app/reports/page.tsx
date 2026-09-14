@@ -132,14 +132,14 @@ export default function ReportsPage() {
           <ReportCard title="Model Performance Summary" icon={Brain} color="#22d3ee" delay={0.1}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {[
-                ['NSE',       '0.891',  '#22d3ee'],
+                ['Test NSE',  '0.9968', '#22d3ee'],
                 ['KGE',       '0.884',  '#06b6d4'],
-                ['RMSE',      '0.08m',  '#a78bfa'],
-                ['MAE',       '0.06m',  '#8b5cf6'],
+                ['Test RMSE', '0.497m', '#a78bfa'],
+                ['Test MAE',  '0.179m', '#8b5cf6'],
                 ['CSI',       '0.82',   '#34d399'],
                 ['POD',       '0.91',   '#10b981'],
                 ['FAR',       '0.14',   '#fbbf24'],
-                ['Accuracy',  '88.0%',  '#34d399'],
+                ['Eval Type', 'Offline Test', '#34d399'],
               ].map(([k, v, c]) => (
                 <div key={k} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px', display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>{k}</span>

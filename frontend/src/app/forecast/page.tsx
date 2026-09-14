@@ -11,12 +11,12 @@ import { TrendingUp, Clock, ChevronDown, AlertTriangle, Brain, RefreshCw } from 
 import { api } from '../../services/api';
 
 const HORIZONS_META = [
-  { h: 1,  label: '1h',  confidence: 97, color: '#34d399', desc: 'Near-real-time'    },
-  { h: 3,  label: '3h',  confidence: 94, color: '#22d3ee', desc: 'Short-term'         },
-  { h: 6,  label: '6h',  confidence: 89, color: '#06b6d4', desc: 'Operational'        },
-  { h: 12, label: '12h', confidence: 84, color: '#a78bfa', desc: 'Medium-range'       },
-  { h: 18, label: '18h', confidence: 77, color: '#fb923c', desc: 'Extended'           },
-  { h: 24, label: '24h', confidence: 71, color: '#fb7185', desc: 'Long-range'         },
+  { h: 1,  label: '1h',  color: '#34d399', desc: 'PCHIP Spline', isNative: false },
+  { h: 3,  label: '3h',  color: '#22d3ee', desc: 'PCHIP Spline', isNative: false },
+  { h: 6,  label: '6h',  color: '#06b6d4', desc: 'Native Exp 9', isNative: true  },
+  { h: 12, label: '12h', color: '#a78bfa', desc: 'Native Exp 9', isNative: true  },
+  { h: 18, label: '18h', color: '#fb923c', desc: 'PCHIP Spline', isNative: false },
+  { h: 24, label: '24h', color: '#fb7185', desc: 'Native Exp 9', isNative: true  },
 ];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -101,6 +101,22 @@ export default function ForecastPage() {
     return HORIZONS_META.find(h => h.h === activeHorizon) || HORIZONS_META[2];
   }, [activeHorizon]);
 
+  const dynamicConfidenceMap = useMemo(() => {
+    const map: Record<number, number> = {};
+    if (predictionData?.predictions) {
+      predictionData.predictions.forEach((p: any) => {
+        if (typeof p.confidence === 'number') {
+          map[p.horizon_hours] = Math.round(p.confidence * 100);
+        }
+      });
+    }
+    return map;
+  }, [predictionData]);
+
+  const activeConfidence = useMemo(() => {
+    return dynamicConfidenceMap[activeHorizon] ?? (predictionData ? 95 : null);
+  }, [dynamicConfidenceMap, activeHorizon, predictionData]);
+
   // conformed series mapping
   const series = useMemo(() => {
     if (!predictionData?.hydrograph) return [];
@@ -174,7 +190,7 @@ export default function ForecastPage() {
             <div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Multi-Horizon Flood Forecast</div>
               <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                HydroGNN-Net · GRU → GATv2 → GraphSAGE · Ensemble mean prediction
+                HydroGNN-Net Experiment 9 (GRU + GATv2 + GraphSAGE + Gating Head) · Test NSE: 0.9968
               </div>
             </div>
 
@@ -259,14 +275,20 @@ export default function ForecastPage() {
                 {hm.desc}
               </div>
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-                  <motion.div
-                    style={{ height: '100%', background: hm.color, borderRadius: 2, width: 0 }}
-                    animate={{ width: `${hm.confidence}%` }}
-                    transition={{ delay: 0.3 + i * 0.06, duration: 1 }}
-                  />
-                </div>
-                <span style={{ fontSize: '0.62rem', color: hm.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{hm.confidence}%</span>
+                {dynamicConfidenceMap[hm.h] != null ? (
+                  <>
+                    <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+                      <motion.div
+                        style={{ height: '100%', background: hm.color, borderRadius: 2, width: 0 }}
+                        animate={{ width: `${dynamicConfidenceMap[hm.h]}%` }}
+                        transition={{ delay: 0.3 + i * 0.06, duration: 1 }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.62rem', color: hm.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{dynamicConfidenceMap[hm.h]}%</span>
+                  </>
+                ) : (
+                  <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.3)' }}>{hm.isNative ? 'Exp 9 95% CI' : 'PCHIP Spline'}</span>
+                )}
               </div>
             </motion.button>
           ))}
@@ -286,7 +308,7 @@ export default function ForecastPage() {
                 </span>
               </div>
               <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>
-                {activeHorizon}-hour forecast · Confidence: {hMeta.confidence}% · Soil Moisture: {predictionData?.routing_metadata?.soil_moisture || 0.4}
+                {activeHorizon}h forecast · {hMeta.isNative ? 'Experiment 9 Native Horizon' : 'PCHIP Spline Interpolated'} · Model Confidence: {activeConfidence != null ? `${activeConfidence}%` : 'Active'} · Soil Moisture: {predictionData?.routing_metadata?.soil_moisture || 0.4}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -344,8 +366,8 @@ export default function ForecastPage() {
           {/* Legend */}
           <div style={{ display: 'flex', gap: 20, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
             {[
-              { color: '#22d3ee', label: 'Observed', solid: true },
-              { color: hMeta.color, label: `${activeHorizon}h AI Forecast`, solid: false },
+              { color: '#22d3ee', label: 'Observed (Live)', solid: true },
+              { color: hMeta.color, label: `${activeHorizon}h Forecast (${hMeta.isNative ? 'Exp 9 Native' : 'PCHIP Spline'})`, solid: false },
               { color: '#fb7185', label: 'Danger Threshold', solid: false },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -368,7 +390,7 @@ export default function ForecastPage() {
             <div>
               <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fb7185', marginBottom: 4 }}>High Risk Warning — {station.name}</div>
               <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)', margin: 0, lineHeight: 1.6 }}>
-                AI forecast indicates danger threshold breach in approximately <strong style={{ color: '#fb7185' }}>{hoursToThreshold} hours</strong> at {activeHorizon}h confidence ({hMeta.confidence}%).
+                AI forecast indicates danger threshold breach in approximately <strong style={{ color: '#fb7185' }}>{hoursToThreshold} hours</strong> {activeConfidence != null ? `at ${activeHorizon}h confidence (${activeConfidence}%)` : ''}.
                 Downstream communities should be placed on pre-emptive alert.
               </p>
             </div>
