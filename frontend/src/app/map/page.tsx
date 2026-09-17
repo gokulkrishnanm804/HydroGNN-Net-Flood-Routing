@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import AppLayout from '../AppLayout';
+import PageHeader from '../components/PageHeader';
 import { STATUS_CONFIG } from '../data/mockData';
-import { Layers, Droplets, Wind, AlertTriangle, MapPin, RefreshCw } from 'lucide-react';
+import { Layers, Droplets, Wind, AlertTriangle, MapPin, RefreshCw, GitBranch } from 'lucide-react';
 import { api } from '../../services/api';
 
 // Dynamic import to avoid SSR issues with Leaflet
@@ -44,9 +45,9 @@ function ErrorBanner({ onRetry }: { onRetry: () => void }) {
 }
 
 const LAYERS = [
-  { id: 'stations',  label: 'Stations',   icon: Radio },
-  { id: 'reservoirs',label: 'Reservoirs', icon: Droplets },
-  { id: 'alerts',    label: 'Alerts',     icon: AlertTriangle },
+  { id: 'stations',   label: 'Gauging Stations', icon: Radio },
+  { id: 'reservoirs', label: 'Reservoirs',       icon: Droplets },
+  { id: 'alerts',     label: 'Active Alerts',    icon: AlertTriangle },
 ];
 
 function Radio({ size, color }: { size: number; color: string }) {
@@ -109,10 +110,23 @@ export default function MapPage() {
 
   return (
     <AppLayout>
-      <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 16, height: 'calc(100vh - 64px)', boxSizing: 'border-box' }}>
+      <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 14, minHeight: 'calc(100vh - 64px)', boxSizing: 'border-box' }}>
+
+        {/* Page Header */}
+        <PageHeader
+          title="Cauvery Basin Spatial Overview"
+          subtitle="View river stations, reservoirs and basin locations across the network"
+          purpose="Understand where monitoring stations and reservoirs are located and how they relate spatially within the Cauvery Basin."
+          instruction="Select a station to view current conditions and forecast."
+          badges={[
+            { label: 'River Network', variant: 'info' },
+            { label: 'Gauging Stations', variant: 'safe' },
+            { label: 'Reservoirs', variant: 'warning' },
+          ]}
+        />
 
         {/* Layer controls */}
-        <motion.div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
+        <motion.div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}
           initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         >
           {LAYERS.map(l => (

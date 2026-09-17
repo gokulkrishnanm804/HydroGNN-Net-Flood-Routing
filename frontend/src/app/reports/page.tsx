@@ -6,6 +6,8 @@ import { FileText, Download, Share2, TrendingUp, Shield, Droplets, Brain, AlertT
 import { api } from '../../services/api';
 import { STATUS_CONFIG } from '../data/mockData';
 
+import PageHeader from '../components/PageHeader';
+
 const REPORT_DATE = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
 function ReportCard({ title, icon: Icon, color, children, delay }: { title: string; icon: any; color: string; children: React.ReactNode; delay: number }) {
@@ -95,25 +97,37 @@ export default function ReportsPage() {
     <AppLayout>
       <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* Report header */}
-        <motion.div className="glass-card gradient-border" style={{ padding: 28 }}
+        {/* Standardized Government Page Header */}
+        <PageHeader
+          title="Model Evaluation & System Reports"
+          subtitle="Verified performance results and system evaluation"
+          purpose="Review held-out model performance and generated evaluation reports."
+          badges={[
+            { label: 'Evaluation: Offline Held-Out Test', variant: 'info' },
+            { label: 'Test NSE: 0.9968', variant: 'safe' },
+            { label: 'Test RMSE: 0.4974 m', variant: 'info' },
+            { label: 'Test MAE: 0.1786 m', variant: 'safe' },
+          ]}
+        />
+
+        {/* Report metadata card */}
+        <motion.div className="glass-card gradient-border" style={{ padding: 24 }}
           initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         >
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 16 }}>
             <div>
-              <div style={{ fontSize: '0.7rem', color: '#22d3ee', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 800 }}>OFFICIAL REPORT</div>
-              <h1 className="gradient-text" style={{ fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: 8 }}>
-                HydroGNN-Net<br />Flood Forecasting Status Report
-              </h1>
-              <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)', maxWidth: 480, lineHeight: 1.6, margin: 0 }}>
-                Spatio-Temporal Graph Neural Network for Real-Time Flood Forecasting in the Cauvery Basin.
-                Prepared for government review and academic publication.
+              <div style={{ fontSize: '0.7rem', color: '#22d3ee', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 800 }}>OFFICIAL EVALUATION DOSSIER</div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f8fafc', marginBottom: 6 }}>
+                HydroGNN-Net System Status & Model Benchmark
+              </h2>
+              <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)', maxWidth: 620, lineHeight: 1.6, margin: 0 }}>
+                Official verification report for the Cauvery River Basin flood-monitoring network and Experiment 9 Spatio-Temporal Graph Neural Network.
               </p>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>Date: {REPORT_DATE}</div>
-              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>Version: 2.4.1</div>
-              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>Classification: Research</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)' }}>Generated: {REPORT_DATE}</div>
+              <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)' }}>Architecture: Experiment 9 (ST-GNN)</div>
+              <div style={{ fontSize: '0.78rem', color: '#34d399', fontWeight: 600 }}>Status: Verified & Production Deployed</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                 <motion.button className="btn btn-primary" style={{ fontSize: '0.78rem', padding: '6px 14px' }} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
                   <Download size={13} />Export PDF
@@ -128,24 +142,27 @@ export default function ReportsPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
-          {/* Model Performance */}
-          <ReportCard title="Model Performance Summary" icon={Brain} color="#22d3ee" delay={0.1}>
+          {/* Model Performance - Verified Offline Metrics */}
+          <ReportCard title="Experiment 9 Held-Out Benchmark Performance" icon={Brain} color="#22d3ee" delay={0.1}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {[
-                ['Test NSE',  '0.9968', '#22d3ee'],
-                ['KGE',       '0.884',  '#06b6d4'],
-                ['Test RMSE', '0.497m', '#a78bfa'],
-                ['Test MAE',  '0.179m', '#8b5cf6'],
-                ['CSI',       '0.82',   '#34d399'],
-                ['POD',       '0.91',   '#10b981'],
-                ['FAR',       '0.14',   '#fbbf24'],
-                ['Eval Type', 'Offline Test', '#34d399'],
+                ['Evaluation Type', 'Offline Held-Out Test', '#a78bfa'],
+                ['Test NSE',        '0.9968',               '#22d3ee'],
+                ['Test RMSE',       '0.4974 m',             '#38bdf8'],
+                ['Test MAE',        '0.1786 m',             '#34d399'],
+                ['Native Horizons', '6h, 12h, 24h',         '#f8fafc'],
+                ['Interpolation',   'PCHIP Spline (1h/3h/18h)', '#94a3b8'],
+                ['Edge Conv',       'GATv2 + GraphSAGE',    '#cbd5e1'],
+                ['Residual Gate',   'Trend-Conditioned',    '#34d399'],
               ].map(([k, v, c]) => (
-                <div key={k} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px', display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>{k}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 700, color: c as string }}>{v}</span>
+                <div key={k} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{k}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 700, color: c as string }}>{v}</span>
                 </div>
               ))}
+            </div>
+            <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(34,211,238,0.06)', borderRadius: 6, border: '1px solid rgba(34,211,238,0.15)', fontSize: '0.74rem', color: 'rgba(255,255,255,0.65)' }}>
+              Note: NSE is the Nash-Sutcliffe Efficiency metric measuring hydrological variance explained relative to observed gauge discharge. It is not classification accuracy.
             </div>
           </ReportCard>
 

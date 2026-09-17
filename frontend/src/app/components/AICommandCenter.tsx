@@ -124,10 +124,10 @@ export default function AICommandCenter({ liveSupportText }: Props) {
           </div>
           <div>
             <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#e2e8f0', letterSpacing: '-0.02em' }}>
-              AI Command Center
+              Decision Support Advisories
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>
-              Decision Support & Flood Advisory · Live
+            <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.42)', marginTop: 1 }}>
+              Rule-based operational advisories derived from current system conditions.
             </div>
           </div>
           <span className="badge badge-safe" style={{ marginLeft: 'auto', fontSize: '0.62rem' }}>

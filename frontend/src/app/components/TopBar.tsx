@@ -6,15 +6,20 @@ import styles from './TopBar.module.css';
 import { api } from '../../services/api';
 
 const BREADCRUMBS: Record<string, { label: string; sub: string }> = {
-  '/':         { label: 'Dashboard',      sub: 'Overview · Real-time monitoring' },
-  '/map':      { label: 'Basin Map',      sub: 'Cauvery Basin · Interactive monitoring' },
-  '/forecast': { label: 'Flood Forecast', sub: 'AI multi-horizon prediction · GNN ensemble' },
-  '/stations': { label: 'Stations',       sub: '8 active river gauging stations' },
-  '/routing':  { label: 'Flood Routing',  sub: 'Downstream propagation · Animated path' },
-  '/model':    { label: 'AI Model',       sub: 'HydroGNN-Net v2.4 · GRU → GATv2 → GraphSAGE' },
-  '/alerts':   { label: 'Alert Center',   sub: 'Warning management · Active incidents' },
-  '/pipeline': { label: 'Data Pipeline',  sub: 'Dataset status · Preprocessing readiness' },
-  '/reports':  { label: 'Reports',        sub: 'Research-grade analysis · Export ready' },
+  '/':              { label: 'Dashboard',      sub: 'Real-time basin overview' },
+  '/map':           { label: 'Basin Map',      sub: 'Spatial river & station view' },
+  '/basin-map':     { label: 'Basin Map',      sub: 'Spatial river & station view' },
+  '/forecast':      { label: 'Flood Forecast', sub: '6–24h water-level prediction' },
+  '/stations':      { label: 'Stations',       sub: 'Station-level monitoring' },
+  '/routing':       { label: 'Flood Routing',  sub: 'River flow propagation' },
+  '/flood-routing': { label: 'Flood Routing',  sub: 'River flow propagation' },
+  '/model':         { label: 'AI Model',       sub: 'Experiment 9 model & performance' },
+  '/alerts':        { label: 'Alerts',         sub: 'Flood warnings & events' },
+  '/pipeline':      { label: 'Data Pipeline',  sub: 'Data sources & freshness' },
+  '/data-pipeline': { label: 'Data Pipeline',  sub: 'Data sources & freshness' },
+  '/reports':       { label: 'Reports',        sub: 'Evaluation & system reports' },
+  '/settings':      { label: 'Settings',       sub: 'System configuration' },
+  '/help':          { label: 'Help',           sub: 'System guide & terminology' },
 };
 
 export default function TopBar() {

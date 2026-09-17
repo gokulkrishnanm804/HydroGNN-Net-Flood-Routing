@@ -133,7 +133,15 @@
   width: 20px; height: 20px; flex-shrink: 0;
   transition: color 0.15s;
 }
-.navLabel { font-size: 0.86rem; font-weight: 500; transition: color 0.15s; overflow: hidden; text-overflow: ellipsis; }
+.navTextCol {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  gap: 1px;
+}
+.navLabel { font-size: 0.84rem; font-weight: 600; transition: color 0.15s; overflow: hidden; text-overflow: ellipsis; }
+.navDesc { font-size: 0.64rem; color: rgba(255, 255, 255, 0.38); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .navBadge {
   margin-left: auto; padding: 2px 7px;
