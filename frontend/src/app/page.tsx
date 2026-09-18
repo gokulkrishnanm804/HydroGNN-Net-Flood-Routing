@@ -308,14 +308,17 @@ export default function DashboardPage() {
       setDiagnostics(diag);
 
       // Default selected station from live list if METTUR is not in list
-      const hasMettur = dash.stations.some(s => s.id === 'METTUR');
-      const firstStation = dash.stations[0]?.id || 'METTUR';
-      const initialStation = hasMettur ? 'METTUR' : firstStation;
-      setSelectedStation(initialStation);
+      const stationsList = dash.stations || [];
+      if (stationsList.length > 0) {
+        const hasMettur = stationsList.some((s: any) => s.id === 'METTUR');
+        const firstStation = stationsList[0]?.id;
+        const initialStation = hasMettur ? 'METTUR' : firstStation;
+        setSelectedStation(initialStation);
 
-      // Fetch initial prediction
-      const pred = await api.getPrediction(initialStation);
-      setPredictionData(pred);
+        // Fetch initial prediction
+        const pred = await api.getPrediction(initialStation);
+        setPredictionData(pred);
+      }
     } catch (err) {
       console.error('Failed fetching live dashboard telemetry:', err);
       setHasError(true);

@@ -53,7 +53,16 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<an
   }
 
   if (!res.ok) {
-    throw new Error(`Request to ${url} failed with status ${res.status}`);
+    let detail = '';
+    try {
+      const errBody = await res.json();
+      if (errBody?.detail) {
+        detail = ` - ${typeof errBody.detail === 'string' ? errBody.detail : JSON.stringify(errBody.detail)}`;
+      }
+    } catch (_) {
+      // Ignore if response body isn't JSON
+    }
+    throw new Error(`Request to ${url} failed with status ${res.status}${detail}`);
   }
 
   return res.json();

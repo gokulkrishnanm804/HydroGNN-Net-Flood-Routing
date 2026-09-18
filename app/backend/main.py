@@ -21,6 +21,20 @@ load_dotenv(_project_dir)
 async def lifespan(app: FastAPI):
     print("Starting HydroGNN-Net backend services...")
     initialize_database()
+    try:
+        from app.backend.services.db.connection import SessionLocal
+        from app.backend.services.db.models import RiverStation
+        from app.backend.services.db.seed import seed_database
+        if SessionLocal is not None:
+            _db = SessionLocal()
+            try:
+                if _db.query(RiverStation).count() == 0:
+                    print("No stations found in database. Running initial seed...")
+                    seed_database(_db)
+            finally:
+                _db.close()
+    except Exception as e:
+        print(f"Warning during startup seed check: {e}")
     await start_realtime_scheduler()
     asyncio.create_task(_startup_satellite_ingest())
     yield  # server is now running

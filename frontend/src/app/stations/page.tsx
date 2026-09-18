@@ -30,15 +30,18 @@ export default function StationsPage() {
       setHasError(false);
       await api.login();
       const dash = await api.getDashboard();
-      setStations(dash.stations);
+      const stationsList = dash.stations || [];
+      setStations(stationsList);
 
-      const hasMettur = dash.stations.some(s => s.id === 'METTUR');
-      const firstStation = dash.stations[0]?.id || 'METTUR';
-      const initialStation = hasMettur ? 'METTUR' : firstStation;
-      setSelectedStationId(initialStation);
+      if (stationsList.length > 0) {
+        const hasMettur = stationsList.some(s => s.id === 'METTUR');
+        const firstStation = stationsList[0]?.id;
+        const initialStation = hasMettur ? 'METTUR' : firstStation;
+        setSelectedStationId(initialStation);
 
-      const pred = await api.getPrediction(initialStation);
-      setPredictionData(pred);
+        const pred = await api.getPrediction(initialStation);
+        setPredictionData(pred);
+      }
     } catch (err) {
       console.error('Failed to load stations overview:', err);
       setHasError(true);

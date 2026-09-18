@@ -57,12 +57,14 @@ export default function ForecastPage() {
       );
       setStations(uniqueStations);
       
-      const hasMettur = uniqueStations.some((s: any) => s.id === 'METTUR');
-      const initialStation = hasMettur ? 'METTUR' : (uniqueStations[0]?.id || 'METTUR');
-      setSelectedStation(initialStation);
-      
-      const pred = await api.getPrediction(initialStation, [1, 3, 6, 12, 18, 24]);
-      setPredictionData(pred);
+      if (uniqueStations.length > 0) {
+        const hasMettur = uniqueStations.some((s: any) => s.id === 'METTUR');
+        const initialStation = hasMettur ? 'METTUR' : uniqueStations[0]?.id;
+        setSelectedStation(initialStation);
+        
+        const pred = await api.getPrediction(initialStation, [1, 3, 6, 12, 18, 24]);
+        setPredictionData(pred);
+      }
     } catch (err) {
       console.error('Failed to load forecast data:', err);
       setHasError(true);
