@@ -2,8 +2,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useMemo } from 'react';
 import AppLayout from '../AppLayout';
+import PageHeader from '../components/PageHeader';
 import { STATUS_CONFIG } from '../data/mockData';
-import { AlertTriangle, Bell, BellOff, Clock, MapPin, TrendingUp, X, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, Clock, MapPin, TrendingUp, X, RefreshCw, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { api } from '../../services/api';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -113,6 +114,17 @@ export default function AlertsPage() {
     <AppLayout>
       <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+        {/* Page Header */}
+        <PageHeader
+          title="Flood Alerts & Events"
+          subtitle="Operational warnings based on monitored river conditions"
+          purpose="Identify stations and conditions that may require attention."
+          badges={[
+            { label: 'Rule-Based Operational Logic', variant: 'info' },
+            { label: `${summary.active} Active Warnings`, variant: summary.active > 0 ? 'warning' : 'safe' },
+          ]}
+        />
+
         {/* Summary row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
@@ -131,18 +143,60 @@ export default function AlertsPage() {
           ))}
         </div>
 
-        {/* Filter */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {(['active', 'all'] as const).map(f => (
-            <button key={f} className={filter === f ? 'btn btn-primary' : 'btn btn-ghost'}
-              onClick={() => setFilter(f)} style={{ fontSize: '0.8rem', padding: '6px 16px' }}>
-              {f === 'active' ? <Bell size={13} /> : <BellOff size={13} />}
-              {f === 'active' ? 'Active Only' : 'All Alerts'}
-            </button>
-          ))}
-          <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
-            {shown.length} alert{shown.length !== 1 ? 's' : ''} shown
-          </span>
+        {/* Section: THRESHOLD STATUS (Rule-Based Operational Logic) */}
+        <div style={{
+          background: 'rgba(10,22,50,0.6)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 14,
+          padding: '16px 20px',
+        }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#22d3ee', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+            OPERATIONAL THRESHOLD STATUS CRITERIA
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            <div style={{ padding: '8px 12px', background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.18)', borderRadius: 10 }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#34d399' }}>SAFE</div>
+              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Water level &lt; 65% of danger threshold; standard drainage.</div>
+            </div>
+            <div style={{ padding: '8px 12px', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.18)', borderRadius: 10 }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24' }}>ALERT</div>
+              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Water level 65%–75% of danger threshold; pre-warning state.</div>
+            </div>
+            <div style={{ padding: '8px 12px', background: 'rgba(251,146,60,0.06)', border: '1px solid rgba(251,146,60,0.18)', borderRadius: 10 }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fb923c' }}>WARNING</div>
+              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Water level 75%–90% of danger threshold; operational preparation.</div>
+            </div>
+            <div style={{ padding: '8px 12px', background: 'rgba(251,113,133,0.06)', border: '1px solid rgba(251,113,133,0.18)', borderRadius: 10 }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fb7185' }}>DANGER</div>
+              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Water level &ge; 90% or breach; immediate decision support action.</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section: CURRENT ALERTS & HISTORY */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+          <div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc' }}>
+              Current Alerts & Event Log
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+              Active station incidents and historical telemetry threshold events
+            </div>
+          </div>
+
+          {/* Filter */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {(['active', 'all'] as const).map(f => (
+              <button key={f} className={filter === f ? 'btn btn-primary' : 'btn btn-ghost'}
+                onClick={() => setFilter(f)} style={{ fontSize: '0.78rem', padding: '5px 14px' }}>
+                {f === 'active' ? <Bell size={12} /> : <BellOff size={12} />}
+                {f === 'active' ? 'Active Only' : 'All Alerts'}
+              </button>
+            ))}
+            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginLeft: 6 }}>
+              {shown.length} shown
+            </span>
+          </div>
         </div>
 
         {/* Alert list */}

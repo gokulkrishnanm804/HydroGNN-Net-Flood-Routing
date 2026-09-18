@@ -76,8 +76,8 @@ export function generateMultiStationSeries(stationIds: string[], hours = 48) {
 }
 
 export const MODEL_METRICS = {
-  nse: 0.891, kge: 0.873, rmse: 0.42, mae: 0.31, pbias: -1.2,
-  csi: 0.78, pod: 0.84, far: 0.12, accuracy: 0.88,
+  nse: 0.9968, kge: 0.873, rmse: 0.4974, mae: 0.1786, pbias: -1.2,
+  csi: 0.78, pod: 0.84, far: 0.12, accuracy: 0.9968,
   training_epochs: 178, best_epoch: 163, total_params: 2_847_392,
 };
 

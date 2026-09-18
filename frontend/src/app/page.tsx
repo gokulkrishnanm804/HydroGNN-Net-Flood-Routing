@@ -13,6 +13,7 @@ import {
 import AppLayout from './AppLayout';
 import KPICard from './components/KPICard';
 import AICommandCenter from './components/AICommandCenter';
+import PageHeader from './components/PageHeader';
 import { STATUS_CONFIG } from './data/mockData';
 import { api } from '../services/api';
 import DataFreshnessPanel from './components/DataFreshnessPanel';
@@ -30,7 +31,7 @@ const ChartTooltip = ({ active, payload, label }: any) => {
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color, display: 'flex', justifyContent: 'space-between', gap: 16, margin: 0 }}>
           <span>{p.name}</span>
-          <strong>{typeof p.value === 'number' ? p.value.toFixed(2) : p.value}</strong>
+          <strong>{typeof p.value === 'number' ? (p.dataKey === 'rainfall' ? `${p.value.toFixed(2)} mm` : `${p.value.toFixed(2)} ft`) : p.value}</strong>
         </p>
       ))}
     </div>
@@ -154,7 +155,7 @@ function StationMiniCard({ station, delay, isSelected, onClick }: { station: any
   const rawStatus = (station.risk_level || 'Safe').toLowerCase();
   const severity = rawStatus === 'severe flood' || rawStatus === 'high risk' ? 'danger' : rawStatus === 'moderate risk' ? 'warning' : rawStatus === 'low risk' ? 'alert' : 'safe';
   const sc = STATUS_CONFIG[severity];
-  
+
   // Estimate trend dynamically based on level ratio
   const trend = pct > 75 ? '↑' : pct < 25 ? '↓' : '→';
   const trendColor = trend === '↑' ? '#fb7185' : trend === '↓' ? '#34d399' : '#fbbf24';
@@ -214,7 +215,7 @@ function StationMiniCard({ station, delay, isSelected, onClick }: { station: any
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
           <span style={{ fontSize: '0.62rem', color: sc.color, fontWeight: 600 }}>{pct.toFixed(0)}% threshold</span>
-          <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.25)' }}>NSE 0.880</span>
+          <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)' }}>Exp 9 Forecast</span>
         </div>
       </motion.div>
     </motion.div>
@@ -260,7 +261,7 @@ function ReservoirGauge({ reservoir, delay }: { reservoir: any; delay: number })
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.88)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{reservoir.name}</div>
           <span style={{ fontSize: '0.58rem', padding: '1px 6px', borderRadius: 4, background: reservoir.data_source === 'live_api' ? 'rgba(16,185,129,0.15)' : 'rgba(6,182,212,0.15)', color: reservoir.data_source === 'live_api' ? '#34d399' : '#22d3ee', border: `1px solid ${reservoir.data_source === 'live_api' ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.3)'}` }}>
-            {reservoir.data_source === 'live_api' ? 'LIVE API' : 'MODEL DERIVED'}
+            {reservoir.data_source === 'live_api' ? 'LIVE API' : 'HYDROLOGICAL MODEL'}
           </span>
         </div>
         <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
@@ -296,7 +297,7 @@ export default function DashboardPage() {
       // Authenticate first
       await api.login();
 
-      // Parallel requests
+      // Critical requests — if any of these fail the dashboard cannot render
       const [dash, activeAlerts, diag] = await Promise.all([
         api.getDashboard(),
         api.getAlerts(),
@@ -345,7 +346,7 @@ export default function DashboardPage() {
   // Memoized lists and averages
   const stations = useMemo(() => dashboardData?.stations || [], [dashboardData]);
   const reservoirs = useMemo(() => dashboardData?.reservoirs || [], [dashboardData]);
-  
+
   const avgLevel = useMemo(() => {
     if (stations.length === 0) return 0.0;
     return stations.reduce((acc: number, s: any) => acc + s.water_level, 0) / stations.length;
@@ -363,11 +364,20 @@ export default function DashboardPage() {
   // Extract Recharts datasets conformed to model
   const telemetryData = useMemo(() => {
     if (!predictionData?.hydrograph) return [];
-    return predictionData.hydrograph.map((h: any) => ({
-      time: h.time,
-      level: h.observed,
-      forecast: h.predicted
-    }));
+    const pts = predictionData.hydrograph;
+    const lastObsIdx = pts.findLastIndex ? pts.findLastIndex((h: any) => h.section === 'observed') : pts.map((h: any) => h.section).lastIndexOf('observed');
+    const lastObsVal = lastObsIdx >= 0 ? pts[lastObsIdx].observed : null;
+
+    return pts.map((h: any, i: number) => {
+      const isBridgePoint = (i === lastObsIdx);
+      return {
+        time: h.time,
+        level: h.observed,
+        forecast: isBridgePoint ? (h.predicted ?? lastObsVal) : h.predicted,
+        upper: isBridgePoint ? (h.upper ?? lastObsVal) : h.upper,
+        lower: isBridgePoint ? (h.lower ?? lastObsVal) : h.lower,
+      };
+    });
   }, [predictionData]);
 
   const rainfallData = useMemo(() => {
@@ -389,44 +399,77 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="page-content">
+        {/* Page Header & Purpose Strip */}
+        <PageHeader
+          title="Cauvery Basin Flood Monitoring"
+          subtitle="Real-time river conditions, rainfall, reservoir status and Experiment 9 forecasts"
+          purpose="Monitor current basin conditions and quickly identify stations or reservoirs that need attention."
+          badges={[
+            { label: 'Live Telemetry', variant: 'safe' },
+            { label: 'Offline Held-Out Test Evaluation', variant: 'info' },
+          ]}
+        />
+
         {/* Alert Banner */}
         <AlertBanner alerts={alerts} lastUpdated={dashboardData?.timestamp_ist || dashboardData?.timestamp} />
+
+        {/* Section A: Current Basin Status */}
+        <div style={{ marginTop: 18, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '-0.01em', color: '#f1f5f9' }}>
+                Current Basin Status
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
+                Monitored telemetry gauges (Live) alongside verified offline held-out test evaluation benchmarks
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* KPI Row */}
         <div className="grid-kpi">
           <KPICard
             title="Active Stations" value={stations.length} unit="online" accent="#22d3ee"
             icon={<Radio size={17} color="#22d3ee" />} delay={0}
-            change={0} changeLabel="all operational" lastUpdated="Live"
+            change={0} changeLabel="all operational" lastUpdated="Live telemetry"
           />
           <KPICard
             title="Avg Water Level" value={avgLevel} decimals={1} unit="ft" accent="#fb7185"
             icon={<Droplets size={17} color="#fb7185" />} delay={1}
-            change={activeWarningsCount} changeLabel="stations at risk" status={activeWarningsCount > 0 ? "danger" : "safe"} lastUpdated="Live"
+            change={activeWarningsCount} changeLabel="stations at risk" status={activeWarningsCount > 0 ? "danger" : "safe"} lastUpdated="Live telemetry"
             sparkVolatility={0.08}
           />
           <KPICard
             title="Avg Rainfall" value={avgRain} decimals={1} unit="mm" accent="#a78bfa"
             icon={<CloudRain size={17} color="#a78bfa" />} delay={2}
-            change={dashboardData?.heavy_rain_stations_count || 0} changeLabel="heavy rain areas" lastUpdated="Live"
+            change={dashboardData?.heavy_rain_stations_count || 0} changeLabel="heavy rain areas" lastUpdated="Live telemetry"
             sparkVolatility={0.12}
           />
           <KPICard
-            title="Model Accuracy" value={88.0} decimals={1} unit="%" accent="#34d399"
+            title="Test NSE" value={0.9968} decimals={4} accent="#34d399"
             icon={<Brain size={17} color="#34d399" />} delay={3}
-            change={1.2} changeLabel="vs baseline" lastUpdated="Diagnostics"
-            sparkVolatility={0.04}
+            changeLabel="Offline test" lastUpdated="Offline held-out evaluation"
+            sparkVolatility={0.02}
           />
           <KPICard
-            title="Avg NSE Score" value={89.1} decimals={1} unit="%" accent="#06b6d4"
+            title="Test RMSE" value={0.4974} decimals={4} unit="m" accent="#06b6d4"
             icon={<Activity size={17} color="#06b6d4" />} delay={4}
-            change={0.8} changeLabel="vs last run" lastUpdated="Diagnostics"
-            sparkVolatility={0.03}
+            changeLabel="Offline test" lastUpdated="Offline held-out evaluation"
+            sparkVolatility={0.02}
           />
         </div>
 
-        {/* Data Freshness & Ingestion Monitor */}
-        <div style={{ marginTop: 20, marginBottom: 20 }}>
+        {/* Section B: Data Freshness & Pipeline Feeds */}
+        <div style={{ marginTop: 24, marginBottom: 20 }}>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '-0.01em', color: '#f1f5f9' }}>
+              Data Freshness & Ingestion Pipeline
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
+              Runtime feeds (OpenWeather, Open-Meteo river telemetry, reservoir state) vs. Experiment 9 loaded model checkpoint
+            </div>
+          </div>
           <DataFreshnessPanel freshnessData={dashboardData?.data_freshness} onRefresh={fetchDashboardStats} />
         </div>
 
@@ -443,10 +486,14 @@ export default function DashboardPage() {
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Water Level — {activeStationDetails?.name || 'Loading'}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Observed 24h timeline convolved with 24h GNN predictions</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
+                    Water Level — Current Conditions & Forecast
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
+                    Observed telemetry and Experiment 9 forecast ({activeStationDetails?.name || 'Cauvery Station'})
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {['12h', '24h', '48h'].map((l, i) => (
@@ -462,13 +509,17 @@ export default function DashboardPage() {
                 <AreaChart data={telemetryData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
                   <defs>
                     <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor="#22d3ee" stopOpacity={0.35} />
-                      <stop offset="60%"  stopColor="#22d3ee" stopOpacity={0.08} />
+                      <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.35} />
+                      <stop offset="60%" stopColor="#22d3ee" stopOpacity={0.08} />
                       <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.01} />
                     </linearGradient>
                     <linearGradient id="areaGradForecast" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor="#a78bfa" stopOpacity={0.3} />
+                      <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.3} />
                       <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.01} />
+                    </linearGradient>
+                    <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.15} />
+                      <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -476,15 +527,36 @@ export default function DashboardPage() {
                   <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} />
                   <Tooltip content={<ChartTooltip />} />
                   <ReferenceLine y={activeStationDetails?.danger_level || 50} stroke="#fb7185" strokeDasharray="5 4" strokeWidth={1.5}
-                    label={{ value: 'Danger', position: 'right', fontSize: 9, fill: '#fb7185' }} />
+                    label={{ value: `Danger (${(activeStationDetails?.danger_level || 50).toFixed(1)}ft)`, position: 'right', fontSize: 9, fill: '#fb7185' }} />
+                  <Area type="monotone" dataKey="upper" stroke="none" fill="url(#ciGrad)" name="Uncertainty — 95% CI" />
                   <Area type="monotone" dataKey="level" stroke="#22d3ee" strokeWidth={2.5}
-                    fill="url(#areaGrad)" dot={false} name="Water Level (m)"
+                    fill="url(#areaGrad)" dot={false} name="Observed — Live"
                     animationDuration={1800} animationEasing="ease-out" />
                   <Area type="monotone" dataKey="forecast" stroke="#a78bfa" strokeWidth={2}
-                    fill="url(#areaGradForecast)" dot={false} name="AI Forecast (m)"
+                    fill="url(#areaGradForecast)" dot={false} name="Forecast — Exp 9"
                     strokeDasharray="6 3" animationDuration={2000} />
                 </AreaChart>
               </ResponsiveContainer>
+
+              {/* Standardized Chart Legend */}
+              <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 16, height: 3, background: '#22d3ee', borderRadius: 2 }} />
+                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Observed — Live</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 16, height: 2, borderTop: '2px dashed #a78bfa' }} />
+                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Forecast — Exp 9</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 16, height: 8, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: 2 }} />
+                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Uncertainty — 95% CI</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 16, height: 2, borderTop: '2px dashed #fb7185' }} />
+                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Danger threshold</span>
+                </div>
+              </div>
             </motion.div>
 
             {/* Rainfall chart */}
@@ -497,14 +569,14 @@ export default function DashboardPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
                 <div>
                   <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Basin Precipitation — {activeStationDetails?.name || 'Loading'}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Cumulative 15-minute observations from OpenWeather/NASA APIs</div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Cumulative 15-minute observations (Live Ingested)</div>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={rainfallData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
                   <defs>
                     <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor="#a78bfa" stopOpacity={0.9} />
+                      <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.9} />
                       <stop offset="100%" stopColor="#6d28d9" stopOpacity={0.5} />
                     </linearGradient>
                   </defs>
@@ -512,7 +584,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} interval={3} />
                   <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} />
                   <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                  <Bar dataKey="rainfall" fill="url(#barGrad)" radius={[4,4,0,0]} name="Rainfall (mm)" maxBarSize={16} animationDuration={1600} />
+                  <Bar dataKey="rainfall" fill="url(#barGrad)" radius={[4, 4, 0, 0]} name="Rainfall (mm)" maxBarSize={16} animationDuration={1600} />
                 </BarChart>
               </ResponsiveContainer>
             </motion.div>
@@ -545,13 +617,22 @@ export default function DashboardPage() {
             {/* AI Center */}
             <AICommandCenter liveSupportText={dashboardData?.decision_support} />
 
-            {/* Reservoirs */}
+            {/* Section E: Reservoirs Operations */}
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Reservoir Storage</div>
-                <span className="badge badge-info" style={{ fontSize: '0.62rem' }}>Live</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
+                    Reservoir Operations — Hydrological Model
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
+                    Storage and release estimates from the reservoir routing model
+                  </div>
+                </div>
+                <span className="badge badge-info" style={{ fontSize: '0.62rem', flexShrink: 0 }}>
+                  Hydrological Model
+                </span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
                 {reservoirs.slice(0, 5).map((r: any, i: number) => <ReservoirGauge key={r.id} reservoir={r} delay={0.6 + i * 0.08} />)}
               </div>
             </motion.div>

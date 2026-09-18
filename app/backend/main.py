@@ -94,18 +94,16 @@ def login(req: LoginRequest):
 
 @app.get("/api/health")
 def health_check():
-    backend_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(backend_dir)
-    model_path = os.path.join(project_dir, "training", "checkpoints", "best_model.pt")
-    
-    if os.path.exists(model_path):
-        model_status = "Loaded"
-    else:
-        model_status = "Unavailable: best_model.pt not found"
-        
+    from app.backend.services.routing.exp9_service import get_exp9_manager
+    try:
+        manager = get_exp9_manager()
+        model_status = "Loaded" if manager.model is not None else "Model Uninitialized"
+    except Exception as e:
+        model_status = f"Unavailable: {e}"
+
     return {
         "status": "Healthy",
-        "model_status": model_status
+        "model_status": model_status,
     }
 
 async def _startup_satellite_ingest():

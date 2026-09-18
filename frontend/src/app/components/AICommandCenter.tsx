@@ -124,10 +124,10 @@ export default function AICommandCenter({ liveSupportText }: Props) {
           </div>
           <div>
             <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#e2e8f0', letterSpacing: '-0.02em' }}>
-              AI Command Center
+              Decision Support Advisories
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>
-              HydroGNN-Net v2.4 · Live inference
+            <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.42)', marginTop: 1 }}>
+              Rule-based operational advisories derived from current system conditions.
             </div>
           </div>
           <span className="badge badge-safe" style={{ marginLeft: 'auto', fontSize: '0.62rem' }}>
@@ -139,7 +139,7 @@ export default function AICommandCenter({ liveSupportText }: Props) {
         {/* Metrics row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 14 }}>
           {[
-            { label: 'Confidence', value: '89.1%', color: '#22d3ee', sub: 'weighted' },
+            { label: 'Decision Engine', value: 'Active', color: '#22d3ee', sub: 'rule-based' },
             { label: 'Last Run',   value: `${mins}:${String(secs).padStart(2,'0')}`, color: '#34d399', sub: 'ago' },
             { label: 'Alerts',    value: String(activeWarningsCount), color: activeWarningsCount > 0 ? '#fb7185' : '#34d399', sub: 'active' },
           ].map(m => (
@@ -153,18 +153,18 @@ export default function AICommandCenter({ liveSupportText }: Props) {
         {/* Processing bar */}
         <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Activity size={11} color="#22d3ee" />
-          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)' }}>Model health</span>
+          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)' }}>Policy engine</span>
           <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
-            <div className="ai-gradient-bar" style={{ height: '100%', width: '89%', borderRadius: 4 }} />
+            <div className="ai-gradient-bar" style={{ height: '100%', width: '100%', borderRadius: 4 }} />
           </div>
-          <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '0.68rem', color: '#34d399' }}>89%</span>
+          <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '0.68rem', color: '#34d399' }}>Active</span>
         </div>
       </div>
 
       {/* Recommendations */}
       <div style={{ padding: '12px 16px 16px' }}>
         <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', marginBottom: 10 }}>
-          AI RECOMMENDATIONS
+          DECISION SUPPORT ADVISORIES
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -212,7 +212,7 @@ export default function AICommandCenter({ liveSupportText }: Props) {
                       <p style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', margin: '8px 0 0' }}>
                         {r.body}
                       </p>
-                      <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>Confidence: {r.confidence}% · {r.time}</div>
+                      <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>Decision Support Confidence: {r.confidence}% (Rule Policy) · {r.time}</div>
                     </motion.div>
                   )}
                 </AnimatePresence>

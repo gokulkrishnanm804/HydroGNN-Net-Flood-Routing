@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useMemo } from 'react';
 import AppLayout from '../AppLayout';
+import PageHeader from '../components/PageHeader';
 import { GitBranch, Droplets, Clock, AlertTriangle, Play, Pause, RotateCcw, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
 import { STATUS_CONFIG } from '../data/mockData';
@@ -237,18 +238,67 @@ export default function RoutingPage() {
     <AppLayout>
       <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* Hero banner */}
-        <motion.div className="glass-card gradient-border" style={{ padding: 24 }}
+        {/* Page Header */}
+        <PageHeader
+          title="Flood Routing"
+          subtitle="Trace how river conditions propagate through the connected river network"
+          purpose="Understand the movement of flood conditions between upstream and downstream locations."
+          badges={[
+            { label: 'Hydrological Routing Model', variant: 'info' },
+            { label: 'Cauvery River Network', variant: 'safe' },
+          ]}
+        />
+
+        {/* Visual UPSTREAM -> RIVER NETWORK -> DOWNSTREAM Flowchart */}
+        <div style={{
+          background: 'rgba(10,24,54,0.7)',
+          border: '1px solid rgba(34,211,238,0.18)',
+          borderRadius: 14,
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ padding: '4px 10px', background: 'rgba(251,146,60,0.15)', border: '1px solid rgba(251,146,60,0.3)', borderRadius: 8 }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fb923c', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                UPSTREAM (Headwaters / Reservoirs)
+              </span>
+            </div>
+            <span style={{ color: '#22d3ee', fontWeight: 800, fontSize: '1.1rem' }}>↓</span>
+            <div style={{ padding: '4px 10px', background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.3)', borderRadius: 8 }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#22d3ee', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                RIVER NETWORK (Routing & Confluences)
+              </span>
+            </div>
+            <span style={{ color: '#22d3ee', fontWeight: 800, fontSize: '1.1rem' }}>↓</span>
+            <div style={{ padding: '4px 10px', background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.3)', borderRadius: 8 }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                DOWNSTREAM (Delta Outflow)
+              </span>
+            </div>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontStyle: 'italic' }}>
+            Hydrological routing calculates flow propagation; Exp 9 GNN forecasts station river levels.
+          </div>
+        </div>
+
+        {/* Hero banner / Controls */}
+        <motion.div className="glass-card gradient-border" style={{ padding: 22 }}
           initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
             <div>
-              <div style={{ fontSize: '0.7rem', color: '#22d3ee', letterSpacing: '0.1em', fontWeight: 800, textTransform: 'uppercase', marginBottom: 6 }}>SIMULATION ENGINE</div>
-              <h1 className="gradient-text" style={{ fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.03em', margin: 0 }}>
-                Downstream Wave Propagation
-              </h1>
-              <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', marginTop: 4, maxWidth: 420 }}>
-                Calculates travel lag, wave speed, attenuation, and spillway release impacts across the Cauvery basin chain.
+              <div style={{ fontSize: '0.68rem', color: '#22d3ee', letterSpacing: '0.1em', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>
+                HYDROLOGICAL ROUTING SIMULATION
+              </div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: '#f8fafc' }}>
+                River Network Flow Propagation
+              </h2>
+              <p style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.45)', marginTop: 4, maxWidth: 520, margin: '4px 0 0' }}>
+                Estimates wave velocity, travel time lag, attenuation, and downstream confluence surges along the main river reaches.
               </p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -326,7 +376,7 @@ export default function RoutingPage() {
                     </motion.div>
                     <div>
                       <div style={{ fontSize: '1.3rem', fontWeight: 900, color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.03em' }}>{sel.label}</div>
-                      <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{sel.type === 'reservoir' ? 'Storage Reservoir' : 'CWC Gauge Station'} · Cauvery Basin</div>
+                      <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{sel.type === 'reservoir' ? 'Storage Reservoir' : 'River Gauge Station'} · Cauvery Basin</div>
                       <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', marginTop: 8, lineHeight: 1.55, maxWidth: 420 }}>{sel.desc}</p>
                     </div>
                   </div>

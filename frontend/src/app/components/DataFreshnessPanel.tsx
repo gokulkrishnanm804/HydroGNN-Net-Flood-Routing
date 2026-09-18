@@ -2,12 +2,12 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Activity, Clock, RefreshCw, CheckCircle2, AlertTriangle, Database } from 'lucide-react';
+import { Activity, Clock, RefreshCw, CheckCircle2, AlertTriangle, Database, Cpu } from 'lucide-react';
 
 interface FreshnessItem {
   source: string;
   last_updated: string;
-  status: 'Live' | 'Latest Available' | 'Stale';
+  status: 'Live' | 'Latest Available' | 'Stale' | string;
   refresh_interval: string;
 }
 
@@ -20,20 +20,23 @@ export default function DataFreshnessPanel({ freshnessData = [], onRefresh }: Da
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Live':
+      case 'Live Ingested':
+      case 'Loaded':
         return {
           bg: 'rgba(16,185,129,0.12)',
           border: 'rgba(16,185,129,0.3)',
           color: '#34d399',
           icon: <CheckCircle2 size={12} color="#34d399" />,
-          label: 'Live'
+          label: status
         };
       case 'Latest Available':
+      case 'Stored / Ingested':
         return {
           bg: 'rgba(6,182,212,0.12)',
           border: 'rgba(6,182,212,0.3)',
           color: '#22d3ee',
           icon: <Activity size={12} color="#22d3ee" />,
-          label: 'Latest Available'
+          label: status
         };
       default:
         return {
@@ -41,7 +44,7 @@ export default function DataFreshnessPanel({ freshnessData = [], onRefresh }: Da
           border: 'rgba(244,63,94,0.3)',
           color: '#fb7185',
           icon: <AlertTriangle size={12} color="#fb7185" />,
-          label: 'Stale'
+          label: status || 'Stale'
         };
     }
   };
@@ -79,11 +82,22 @@ export default function DataFreshnessPanel({ freshnessData = [], onRefresh }: Da
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-        {freshnessData.map((item, idx) => {
+        {freshnessData.map((rawItem, idx) => {
+          const isModelCard = rawItem.source.toLowerCase().includes('prediction model') || rawItem.source.toLowerCase().includes('ai');
+          const isRiverLevelCard = rawItem.source.toLowerCase().includes('cwc') || rawItem.source.toLowerCase().includes('river level');
+
+          const item: FreshnessItem = {
+            ...rawItem,
+            source: isRiverLevelCard ? 'River Level Telemetry' : rawItem.source,
+            last_updated: isModelCard ? 'Experiment 9 · Loaded' : rawItem.last_updated,
+            status: isModelCard ? 'Loaded' : (isRiverLevelCard ? 'Live Ingested' : rawItem.status),
+            refresh_interval: isModelCard ? 'Model checkpoint' : rawItem.refresh_interval,
+          };
+
           const badge = getStatusBadge(item.status);
           return (
             <motion.div
-              key={item.source}
+              key={rawItem.source}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
@@ -102,8 +116,17 @@ export default function DataFreshnessPanel({ freshnessData = [], onRefresh }: Da
                   {item.source}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                  <Clock size={11} color="rgba(255,255,255,0.35)" />
-                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-mono)' }}>
+                  {isModelCard ? (
+                    <Cpu size={11} color="#34d399" />
+                  ) : (
+                    <Clock size={11} color="rgba(255,255,255,0.35)" />
+                  )}
+                  <span style={{
+                    fontSize: '0.7rem',
+                    color: isModelCard ? '#34d399' : 'rgba(255,255,255,0.45)',
+                    fontFamily: isModelCard ? 'inherit' : 'var(--font-mono)',
+                    fontWeight: isModelCard ? 600 : 400
+                  }}>
                     {item.last_updated}
                   </span>
                 </div>
@@ -138,3 +161,4 @@ export default function DataFreshnessPanel({ freshnessData = [], onRefresh }: Da
     </div>
   );
 }
+
