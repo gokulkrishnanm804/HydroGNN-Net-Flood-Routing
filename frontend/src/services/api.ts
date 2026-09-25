@@ -84,12 +84,15 @@ export const api = {
   // Dashboard
   async getDashboard(): Promise<{
     timestamp: string;
+    timestamp_ist?: string;
+    data_status?: string;
     active_warnings: number;
     average_reservoir_fill_pct: number;
     heavy_rain_stations_count: number;
     stations: any[];
     reservoirs: any[];
-    decision_support: string;
+    decision_support?: any;
+    data_freshness?: any[];
   }> {
     return fetchWithAuth(`${API_BASE}/api/dashboard`);
   },

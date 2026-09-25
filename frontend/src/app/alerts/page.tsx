@@ -1,28 +1,22 @@
 'use client';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import AppLayout from '../AppLayout';
-import PageHeader from '../components/PageHeader';
-import { STATUS_CONFIG } from '../data/mockData';
-import { AlertTriangle, Bell, BellOff, Clock, MapPin, TrendingUp, X, RefreshCw, ShieldCheck, ShieldAlert } from 'lucide-react';
+import RiskBadge from '../components/RiskBadge';
+import { LoadingSkeleton, ErrorBanner, EmptyState } from '../components/StateViews';
 import { api } from '../../services/api';
-
-const TYPE_COLORS: Record<string, string> = {
-  LEVEL_CRITICAL: '#fb7185',
-  RISING_TREND:   '#fb923c',
-  RESERVOIR_HIGH: '#fbbf24',
-  FORECAST_WARN:  '#fb923c',
-  INFLOW_SPIKE:   '#fbbf24',
-  RESOLVED:       '#34d399',
-  CRITICAL:       '#fb7185',
-  WARNING:        '#fb923c',
-  ALERT:          '#fbbf24',
-};
+import {
+  Bell,
+  AlertTriangle,
+  CheckCircle,
+  ShieldCheck,
+  Clock,
+  MapPin,
+  HelpCircle,
+} from 'lucide-react';
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<any[]>([]);
-  const [filter, setFilter] = useState<'all' | 'active'>('active');
-  const [dismissed, setDismissed] = useState<number[]>([]);
+  const [activeTab, setActiveTab] = useState<'active' | 'resolved'>('active');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
 
@@ -32,22 +26,25 @@ export default function AlertsPage() {
       setHasError(false);
       await api.login();
       const logs = await api.getAlerts();
-      
-      // Inject numerical IDs for React map rendering keys
-      const formatted = logs.map((l: any, i: number) => ({
-        ...l,
-        id: l.id || (i + 1),
-        // Standardize keys
+
+      const formatted = (logs || []).map((l: any, i: number) => ({
+        id: l.id || i + 1,
+        station: l.station_name || 'Cauvery Reach',
         severity: l.severity || 'WARNING',
-        station: l.station_name || 'System',
-        time: l.timestamp.split(' ')[1] || 'Just now',
-        type: l.event_type || 'ALERT',
-        msg: l.message,
+        current_level: l.level_m || null,
+        trigger: l.event_type || l.message || 'Operational threshold exceeded',
+        time: l.timestamp || 'Recent',
         active: l.active !== undefined ? l.active : true,
+        advisory:
+          l.advisory ||
+          (l.severity === 'CRITICAL'
+            ? 'Issue immediate flood bulletin and prepare low-lying reach evacuations.'
+            : 'Maintain intensified hourly stage monitoring and alert local reservoir authorities.'),
       }));
+
       setAlerts(formatted);
     } catch (err) {
-      console.error('Failed to load alert logs:', err);
+      console.error('Failed to load alerts:', err);
       setHasError(true);
     } finally {
       setIsLoading(false);
@@ -58,37 +55,20 @@ export default function AlertsPage() {
     fetchAlerts();
   }, []);
 
-  const shown = useMemo(() => {
+  const activeAlerts = useMemo(() => {
     return alerts
-      .filter(a => !dismissed.includes(a.id))
-      .filter(a => filter === 'all' || a.active);
-  }, [alerts, dismissed, filter]);
+      .filter((a) => a.active)
+      .sort((a, b) => (a.severity === 'CRITICAL' ? -1 : 1));
+  }, [alerts]);
 
-  // Alert summary counts
-  const summary = useMemo(() => {
-    const activeAlerts = alerts.filter(a => a.active && !dismissed.includes(a.id));
-    const warnings = activeAlerts.filter(a => a.severity.toLowerCase() === 'warning');
-    const critical = activeAlerts.filter(a => a.severity.toLowerCase() === 'critical');
-    return {
-      active: activeAlerts.length,
-      warnings: warnings.length,
-      critical: critical.length,
-      resolved: alerts.filter(a => !a.active).length,
-    };
-  }, [alerts, dismissed]);
+  const resolvedAlerts = useMemo(() => {
+    return alerts.filter((a) => !a.active);
+  }, [alerts]);
 
   if (isLoading) {
     return (
       <AppLayout>
-        <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} style={{ height: 90, background: 'rgba(255,255,255,0.03)', borderRadius: 14 }} className="shimmer" />
-            ))}
-          </div>
-          <div style={{ height: 110, background: 'rgba(255,255,255,0.03)', borderRadius: 16 }} className="shimmer" />
-          <div style={{ height: 110, background: 'rgba(255,255,255,0.03)', borderRadius: 16 }} className="shimmer" />
-        </div>
+        <LoadingSkeleton rows={4} height={100} />
       </AppLayout>
     );
   }
@@ -96,173 +76,145 @@ export default function AlertsPage() {
   if (hasError) {
     return (
       <AppLayout>
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          minHeight: 'calc(100vh - 120px)', gap: 16, padding: 32, textAlign: 'center',
-        }}>
-          <AlertTriangle size={48} color="#fb7185" />
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#e2e8f0' }}>Failed to Load Alerts</h3>
-          <button className="btn btn-primary" onClick={fetchAlerts}>
-            <RefreshCw size={14} /> Retry
-          </button>
-        </div>
+        <ErrorBanner onRetry={fetchAlerts} />
       </AppLayout>
     );
   }
 
+  const currentList = activeTab === 'active' ? activeAlerts : resolvedAlerts;
+
   return (
     <AppLayout>
-      <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-        {/* Page Header */}
-        <PageHeader
-          title="Flood Alerts & Events"
-          subtitle="Operational warnings based on monitored river conditions"
-          purpose="Identify stations and conditions that may require attention."
-          badges={[
-            { label: 'Rule-Based Operational Logic', variant: 'info' },
-            { label: `${summary.active} Active Warnings`, variant: summary.active > 0 ? 'warning' : 'safe' },
-          ]}
-        />
-
-        {/* Summary row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          {[
-            { label: 'Active Alerts',  value: summary.active,  color: '#fb7185', bg: 'rgba(244,63,94,0.1)' },
-            { label: 'Warnings',       value: summary.warnings, color: '#fb923c', bg: 'rgba(251,146,60,0.1)' },
-            { label: 'Critical Risks',  value: summary.critical, color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
-            { label: 'Resolved (24h)', value: summary.resolved, color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
-          ].map((s, i) => (
-            <motion.div key={s.label}
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-              style={{ background: s.bg, border: `1px solid ${s.color}25`, borderRadius: 14, padding: '16px 18px' }}
-            >
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '2rem', fontWeight: 800, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 4 }}>{s.label}</div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Section: THRESHOLD STATUS (Rule-Based Operational Logic) */}
-        <div style={{
-          background: 'rgba(10,22,50,0.6)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 14,
-          padding: '16px 20px',
-        }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#22d3ee', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-            OPERATIONAL THRESHOLD STATUS CRITERIA
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            <div style={{ padding: '8px 12px', background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.18)', borderRadius: 10 }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#34d399' }}>SAFE</div>
-              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Water level &lt; 65% of danger threshold; standard drainage.</div>
-            </div>
-            <div style={{ padding: '8px 12px', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.18)', borderRadius: 10 }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24' }}>ALERT</div>
-              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Water level 65%–75% of danger threshold; pre-warning state.</div>
-            </div>
-            <div style={{ padding: '8px 12px', background: 'rgba(251,146,60,0.06)', border: '1px solid rgba(251,146,60,0.18)', borderRadius: 10 }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fb923c' }}>WARNING</div>
-              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Water level 75%–90% of danger threshold; operational preparation.</div>
-            </div>
-            <div style={{ padding: '8px 12px', background: 'rgba(251,113,133,0.06)', border: '1px solid rgba(251,113,133,0.18)', borderRadius: 10 }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fb7185' }}>DANGER</div>
-              <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>Water level &ge; 90% or breach; immediate decision support action.</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Section: CURRENT ALERTS & HISTORY */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* Top Header & Tab Toggle */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc' }}>
-              Current Alerts & Event Log
-            </div>
-            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-              Active station incidents and historical telemetry threshold events
-            </div>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 600, color: '#f8fafc', margin: 0 }}>
+              Actionable Flood Hazard Warnings
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '2px 0 0' }}>
+              Real-time threshold exceedance alerts and disaster management advisories
+            </p>
           </div>
 
-          {/* Filter */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {(['active', 'all'] as const).map(f => (
-              <button key={f} className={filter === f ? 'btn btn-primary' : 'btn btn-ghost'}
-                onClick={() => setFilter(f)} style={{ fontSize: '0.78rem', padding: '5px 14px' }}>
-                {f === 'active' ? <Bell size={12} /> : <BellOff size={12} />}
-                {f === 'active' ? 'Active Only' : 'All Alerts'}
-              </button>
-            ))}
-            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginLeft: 6 }}>
-              {shown.length} shown
-            </span>
+          {/* Active vs Resolved Tabs */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`btn btn-sm ${activeTab === 'active' ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              Active Warnings ({activeAlerts.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('resolved')}
+              className={`btn btn-sm ${activeTab === 'resolved' ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              Resolved History ({resolvedAlerts.length})
+            </button>
           </div>
         </div>
 
-        {/* Alert list */}
-        <AnimatePresence>
-          {shown.map((a, i) => {
-            const rawSev = a.severity.toLowerCase();
-            const severity = rawSev === 'critical' ? 'danger' : rawSev === 'warning' ? 'warning' : rawSev === 'alert' ? 'alert' : 'safe';
-            const sc = STATUS_CONFIG[severity] || STATUS_CONFIG.safe;
-            const typeColor = TYPE_COLORS[a.type] || '#fb7185';
-            
-            return (
-              <motion.div key={a.id}
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40, height: 0 }}
-                transition={{ delay: i * 0.06 }}
-                style={{
-                  background: `${sc.bg}`,
-                  border: `1px solid ${sc.border}`,
-                  borderRadius: 16,
-                  padding: '18px 20px',
-                  boxShadow: a.active ? sc.shadow : 'none',
-                  position: 'relative',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: `${typeColor}20`, border: `1px solid ${typeColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <AlertTriangle size={18} color={typeColor} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#e2e8f0' }}>{a.station}</span>
-                      <span className={`badge badge-${severity}`} style={{ fontSize: '0.62rem' }}>
-                        <span className={`status-dot status-${severity}`} />
-                        {sc.label}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: typeColor, background: `${typeColor}15`, padding: '2px 8px', borderRadius: 4, fontWeight: 600, letterSpacing: '0.04em' }}>{a.type.replace(/_/g, ' ')}</span>
-                      {a.active && <span style={{ fontSize: '0.65rem', color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 8px', borderRadius: 4 }}>ACTIVE</span>}
-                    </div>
-                    <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0 }}>{a.msg}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
-                      <Clock size={12} color="rgba(255,255,255,0.3)" />
-                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>{a.time} (Database dispatch)</span>
-                      <MapPin size={12} color="rgba(255,255,255,0.3)" />
-                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>Cauvery Basin</span>
-                    </div>
-                  </div>
-                  <motion.button
-                    onClick={() => setDismissed(d => [...d, a.id])}
-                    whileHover={{ scale: 1.1, color: '#fb7185' }}
-                    whileTap={{ scale: 0.9 }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: 4 }}
-                  >
-                    <X size={16} />
-                  </motion.button>
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+        {/* Alerts List */}
+        {currentList.length === 0 ? (
+          <EmptyState
+            title={activeTab === 'active' ? 'No Active Flood Alerts' : 'No Resolved Alert Records'}
+            message={
+              activeTab === 'active'
+                ? 'All monitored Cauvery Basin gauges are operating within normal design safety thresholds.'
+                : 'No historical alert resolutions logged in the current operational cycle.'
+            }
+            icon={ShieldCheck}
+          />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {currentList.map((alert) => {
+              const isCritical = alert.severity === 'CRITICAL' || alert.severity === 'Severe Flood';
 
-        {shown.length === 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.3)' }}
-          >
-            <Bell size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-            <p>No active alerts to display</p>
-          </motion.div>
+              return (
+                <div
+                  key={alert.id}
+                  className="card"
+                  style={{
+                    borderLeft: `4px solid ${isCritical ? '#ef4444' : '#f59e0b'}`,
+                    padding: '16px 20px',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 6,
+                          backgroundColor: isCritical
+                            ? 'rgba(239, 68, 68, 0.12)'
+                            : 'rgba(245, 158, 11, 0.12)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: isCritical ? '#ef4444' : '#f59e0b',
+                        }}
+                      >
+                        <AlertTriangle size={16} />
+                      </div>
+
+                      <div>
+                        <h4 style={{ fontSize: '0.94rem', fontWeight: 600, color: '#f8fafc', margin: 0 }}>
+                          {alert.station}
+                        </h4>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Clock size={11} /> {alert.time}
+                          </span>
+                          {alert.current_level && (
+                            <span>
+                              Stage:{' '}
+                              <strong style={{ color: '#f8fafc' }}>
+                                {Number(alert.current_level).toFixed(2)} ft
+                              </strong>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <RiskBadge level={alert.severity} />
+                  </div>
+
+                  {/* Trigger Reason */}
+                  <div style={{ fontSize: '0.82rem', color: '#e2e8f0', margin: '8px 0 10px', paddingLeft: 42 }}>
+                    <strong>Trigger Condition:</strong> {alert.trigger}
+                  </div>
+
+                  {/* Recommended Action / Advisory */}
+                  <div
+                    style={{
+                      marginLeft: 42,
+                      padding: '8px 12px',
+                      backgroundColor: 'var(--bg-surface)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 6,
+                      fontSize: '0.76rem',
+                      color: '#94a3b8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ color: '#0ea5e9', fontWeight: 600 }}>Recommended Action:</span>
+                    <span>{alert.advisory}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </AppLayout>

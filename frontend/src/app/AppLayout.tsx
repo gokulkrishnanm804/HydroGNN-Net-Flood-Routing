@@ -1,55 +1,55 @@
 'use client';
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
-import NeuralBackground from './components/NeuralBackground';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const sidebarW = collapsed ? 72 : 264;
+  const [collapsed, setCollapsed] = useState<boolean>(false);
+  const sidebarWidth = collapsed ? 68 : 240;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative' }}>
-      {/* Layered backgrounds */}
-      <NeuralBackground />
-      <div className="bg-mesh" />
-      <div className="bg-aurora" />
-
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
       {/* Sidebar */}
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
 
-      {/* Main */}
-      <motion.main
-        style={{ flex: 1, minHeight: '100vh', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column' }}
-        animate={{ marginLeft: sidebarW }}
-        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+      {/* Main Workspace */}
+      <div
+        style={{
+          marginLeft: sidebarWidth,
+          flex: 1,
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'margin-left 0.2s ease',
+          width: `calc(100% - ${sidebarWidth}px)`,
+        }}
       >
-        {/* TopBar adapts to sidebar width */}
-        <motion.div
-          style={{ position: 'fixed', top: 0, right: 0, zIndex: 90 }}
-          animate={{ left: sidebarW }}
-          transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+        {/* TopBar */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 40,
+            width: '100%',
+          }}
         >
           <TopBar />
-        </motion.div>
-
-        {/* Page content area below fixed TopBar */}
-        <div style={{ paddingTop: 64, flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={typeof window !== 'undefined' ? window.location.pathname : 'p'}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
         </div>
-      </motion.main>
+
+        {/* Content Container */}
+        <main
+          style={{
+            flex: 1,
+            padding: '24px 28px',
+            maxWidth: 1600,
+            width: '100%',
+            boxSizing: 'border-box',
+            margin: '0 auto',
+          }}
+        >
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

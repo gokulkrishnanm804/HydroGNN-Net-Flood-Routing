@@ -1,53 +1,39 @@
 'use client';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useMemo } from 'react';
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine,
-} from 'recharts';
+import React, { useState, useEffect, useMemo } from 'react';
 import AppLayout from '../AppLayout';
-import PageHeader from '../components/PageHeader';
-import { STATUS_CONFIG } from '../data/mockData';
-import { TrendingUp, Clock, ChevronDown, AlertTriangle, Brain, RefreshCw } from 'lucide-react';
+import RiskBadge from '../components/RiskBadge';
+import { LoadingSkeleton, ErrorBanner } from '../components/StateViews';
 import { api } from '../../services/api';
-
-const HORIZONS_META = [
-  { h: 1,  label: '1h',  color: '#34d399', desc: 'PCHIP Spline', isNative: false },
-  { h: 3,  label: '3h',  color: '#22d3ee', desc: 'PCHIP Spline', isNative: false },
-  { h: 6,  label: '6h',  color: '#06b6d4', desc: 'Native Exp 9', isNative: true  },
-  { h: 12, label: '12h', color: '#a78bfa', desc: 'Native Exp 9', isNative: true  },
-  { h: 18, label: '18h', color: '#fb923c', desc: 'PCHIP Spline', isNative: false },
-  { h: 24, label: '24h', color: '#fb7185', desc: 'Native Exp 9', isNative: true  },
-];
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{
-      background: 'rgba(8,18,40,0.96)', backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(34,211,238,0.2)', borderRadius: 12,
-      padding: '10px 14px', fontSize: '0.78rem', boxShadow: '0 16px 48px rgba(0,0,0,0.7)',
-    }}>
-      <p style={{ color: 'rgba(255,255,255,0.4)', marginBottom: 5, fontSize: '0.7rem' }}>{label}</p>
-      {payload.map((p: any) => p.value != null && (
-        <p key={p.dataKey} style={{ color: p.color, display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 2 }}>
-          <span>{p.name}</span><strong>{Number(p.value).toFixed(2)}ft</strong>
-        </p>
-      ))}
-    </div>
-  );
-};
+import {
+  Brain,
+  Shield,
+  Layers,
+  Info,
+  Clock,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  Droplets,
+  AlertTriangle,
+  RefreshCw,
+  Cpu,
+  Compass,
+  CheckCircle2,
+  Sliders,
+  ShieldAlert,
+  Gauge,
+  Navigation,
+} from 'lucide-react';
 
 export default function ForecastPage() {
   const [stations, setStations] = useState<any[]>([]);
-  const [selectedStation, setSelectedStation] = useState('METTUR');
-  const [activeHorizon, setActiveHorizon] = useState(6);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedStationId, setSelectedStationId] = useState<string>('METTUR');
   const [predictionData, setPredictionData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
 
-  const fetchInitialData = async () => {
+  const loadInitialData = async () => {
     try {
       setIsLoading(true);
       setHasError(false);
@@ -57,13 +43,14 @@ export default function ForecastPage() {
         new Map((dash.stations || []).map((s: any) => [s.id, s])).values()
       );
       setStations(uniqueStations);
-      
+
       if (uniqueStations.length > 0) {
-        const hasMettur = uniqueStations.some((s: any) => s.id === 'METTUR');
-        const initialStation = hasMettur ? 'METTUR' : uniqueStations[0]?.id;
-        setSelectedStation(initialStation);
-        
-        const pred = await api.getPrediction(initialStation, [1, 3, 6, 12, 18, 24]);
+        const initial = uniqueStations.some((s: any) => s.id === 'METTUR')
+          ? 'METTUR'
+          : uniqueStations[0]?.id;
+        setSelectedStationId(initial);
+
+        const pred = await api.getPrediction(initial, [1, 3, 6, 12, 18, 24]);
         setPredictionData(pred);
       }
     } catch (err) {
@@ -75,370 +62,789 @@ export default function ForecastPage() {
   };
 
   useEffect(() => {
-    fetchInitialData();
+    loadInitialData();
   }, []);
 
   const handleStationChange = async (stationId: string) => {
     try {
-      setSelectedStation(stationId);
-      setShowDropdown(false);
+      setIsRefreshing(true);
+      setSelectedStationId(stationId);
       const pred = await api.getPrediction(stationId, [1, 3, 6, 12, 18, 24]);
       setPredictionData(pred);
     } catch (err) {
-      console.error(`Failed to fetch GNN predictions for station ${stationId}:`, err);
+      console.error(`Failed to fetch forecast for station ${stationId}:`, err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  const station = useMemo(() => {
-    return stations.find(s => s.id === selectedStation) || stations[0];
-  }, [stations, selectedStation]);
+  const selectedStation = useMemo(() => {
+    return stations.find((s: any) => s.id === selectedStationId) || stations[0] || null;
+  }, [stations, selectedStationId]);
 
-  const sc = useMemo(() => {
-    if (!station) return STATUS_CONFIG.safe;
-    const rawStatus = (station.risk_level || 'Safe').toLowerCase();
-    const severity = rawStatus === 'severe flood' || rawStatus === 'high risk' ? 'danger' : rawStatus === 'moderate risk' ? 'warning' : rawStatus === 'low risk' ? 'alert' : 'safe';
-    return STATUS_CONFIG[severity];
-  }, [station]);
-
-  const hMeta = useMemo(() => {
-    return HORIZONS_META.find(h => h.h === activeHorizon) || HORIZONS_META[2];
-  }, [activeHorizon]);
-
-  const dynamicConfidenceMap = useMemo(() => {
-    const map: Record<number, number> = {};
-    if (predictionData?.predictions) {
-      predictionData.predictions.forEach((p: any) => {
-        if (typeof p.confidence === 'number') {
-          map[p.horizon_hours] = Math.round(p.confidence * 100);
-        }
-      });
+  const currentObservedLevel = useMemo(() => {
+    if (!predictionData?.hydrograph) return Number(selectedStation?.water_level || 0);
+    const obs = predictionData.hydrograph.filter((p: any) => p.observed != null);
+    if (obs.length > 0) {
+      return Number(obs[obs.length - 1].observed);
     }
-    return map;
-  }, [predictionData]);
+    return Number(selectedStation?.water_level || 0);
+  }, [predictionData, selectedStation]);
 
-  const activeConfidence = useMemo(() => {
-    return dynamicConfidenceMap[activeHorizon] ?? (predictionData ? 95 : null);
-  }, [dynamicConfidenceMap, activeHorizon, predictionData]);
+  const dangerLevel = useMemo(() => {
+    return Number(selectedStation?.danger_level || predictionData?.danger_level_m || 393.7);
+  }, [selectedStation, predictionData]);
 
-  // conformed series mapping
-  const series = useMemo(() => {
-    if (!predictionData?.hydrograph) return [];
-    return predictionData.hydrograph.map((h: any) => ({
-      label: h.time,
-      level: h.observed,
-      forecast: h.predicted,
-      upper: h.upper,
-      lower: h.lower
-    }));
-  }, [predictionData]);
+  const warningLevel = useMemo(() => {
+    return Number(selectedStation?.warning_level || predictionData?.warning_level_m || dangerLevel * 0.8);
+  }, [selectedStation, predictionData, dangerLevel]);
 
-  const predictedPeak = useMemo(() => {
-    if (!predictionData?.predictions) return 0.0;
-    const matched = predictionData.predictions.find((p: any) => p.horizon_hours === activeHorizon);
-    return matched ? matched.level_m : (station?.water_level || 0.0) + 1.2;
-  }, [predictionData, activeHorizon, station]);
+  // Clearance Headroom
+  const currentClearance = useMemo(() => {
+    return Math.max(0, dangerLevel - currentObservedLevel);
+  }, [dangerLevel, currentObservedLevel]);
 
-  const hoursToThreshold = useMemo(() => {
-    if (!station) return 0;
-    return station.danger_level > station.water_level
-      ? Math.round((station.danger_level - station.water_level) / 0.22)
-      : 0;
-  }, [station]);
+  // Extract native 6h, 12h, 24h predictions
+  const nativePredictions = useMemo(() => {
+    if (!predictionData?.predictions) return [];
+    return [6, 12, 24].map((h) => {
+      const p = predictionData.predictions.find((item: any) => item.horizon_hours === h);
+      const lvl = p ? p.level_m : null;
+      const delta = lvl != null && currentObservedLevel != null ? lvl - currentObservedLevel : null;
+      const clearance = lvl != null ? Math.max(0, dangerLevel - lvl) : null;
+      return {
+        horizon: h,
+        level_ft: lvl,
+        level_m: lvl != null ? lvl / 3.28084 : null,
+        delta_ft: delta,
+        uncertainty_ft: p ? p.uncertainty_m : null,
+        flood_probability: p ? p.flood_probability : 0,
+        severity: p ? p.severity : 'Safe',
+        confidence: p ? p.confidence : 0.95,
+        clearance_ft: clearance,
+      };
+    });
+  }, [predictionData, currentObservedLevel, dangerLevel]);
+
+  // All 6 horizons detailed trajectory
+  const detailedSchedule = useMemo(() => {
+    if (!predictionData?.predictions) return [];
+    const horizons = [1, 3, 6, 12, 18, 24];
+    return horizons.map((h) => {
+      const p = predictionData.predictions.find((item: any) => item.horizon_hours === h);
+      const lvl = p ? Number(p.level_m) : currentObservedLevel;
+      const delta = lvl - currentObservedLevel;
+      const unc = p ? Number(p.uncertainty_m) : 0.5;
+      const lower = Math.max(0.1, lvl - unc);
+      const upper = lvl + unc;
+      const clearance = Math.max(0, dangerLevel - lvl);
+      const isNative = [6, 12, 24].includes(h);
+
+      // Estimated future time
+      const date = new Date();
+      date.setHours(date.getHours() + h);
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      const dayStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+      // Action Protocol
+      let advisory = 'Normal Baseflow — Routine Monitoring';
+      if (lvl >= dangerLevel) {
+        advisory = 'Emergency: Stage Exceeds Danger Mark — Initiate Evacuation Protocol';
+      } else if (lvl >= warningLevel) {
+        advisory = 'Warning: Approaching Critical Stage — Sluice Gates on Alert';
+      } else if (delta > 1.5) {
+        advisory = 'Rising Trajectory: Downstream Watch in Effect';
+      }
+
+      return {
+        horizon: h,
+        isNative,
+        timeStr: `${dayStr}, ${timeStr}`,
+        level_ft: lvl,
+        level_m: lvl / 3.28084,
+        delta_ft: delta,
+        uncertainty_ft: unc,
+        lower_ft: lower,
+        upper_ft: upper,
+        clearance_ft: clearance,
+        flood_prob_pct: Math.round((p?.flood_probability || (lvl / dangerLevel)) * 100),
+        severity: p?.severity || (lvl >= dangerLevel ? 'High Risk' : 'Safe'),
+        confidence: Math.round((p?.confidence || 0.95) * 100),
+        advisory,
+      };
+    });
+  }, [predictionData, currentObservedLevel, dangerLevel, warningLevel]);
 
   if (isLoading) {
     return (
       <AppLayout>
-        <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ height: 60, background: 'rgba(255,255,255,0.03)', borderRadius: 16 }} className="shimmer" />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} style={{ height: 80, background: 'rgba(255,255,255,0.03)', borderRadius: 16 }} className="shimmer" />
-            ))}
-          </div>
-          <div style={{ height: 320, background: 'rgba(255,255,255,0.03)', borderRadius: 20 }} className="shimmer" />
-        </div>
+        <LoadingSkeleton rows={5} height={100} />
       </AppLayout>
     );
   }
 
-  if (hasError || !station) {
+  if (hasError || !selectedStation) {
     return (
       <AppLayout>
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          minHeight: 'calc(100vh - 120px)', gap: 16, padding: 32, textAlign: 'center',
-        }}>
-          <AlertTriangle size={48} color="#fb7185" />
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#e2e8f0' }}>No Forecast Data Available</h3>
-          <button className="btn btn-primary" onClick={fetchInitialData}>
-            <RefreshCw size={14} /> Retry
-          </button>
-        </div>
+        <ErrorBanner onRetry={loadInitialData} />
       </AppLayout>
     );
   }
+
+  const meta = predictionData?.routing_metadata || {};
 
   return (
     <AppLayout>
-      <div className="page-content">
-
-        {/* Page Header & Purpose */}
-        <PageHeader
-          title="Flood Forecast"
-          subtitle="Experiment 9 multi-horizon water-level prediction"
-          purpose="Estimate future river water levels from the current observed state for operational planning."
-          badges={[
-            { label: 'Native Exp 9 (6h, 12h, 24h)', variant: 'info' },
-            { label: 'PCHIP Spline (1h, 3h, 18h)', variant: 'safe' },
-            { label: 'Held-Out Test NSE: 0.9968', variant: 'info' },
-          ]}
-        />
-
-        {/* Hero / Station Selector Bar */}
-        <motion.div className="glass-card gradient-border" style={{ padding: '16px 24px', overflow: 'visible', zIndex: 50 }}
-          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+        {/* Top Control Header: Station Selector & Real-Time Context */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 16,
+            padding: '18px 22px',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 8,
+          }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <div className="ring-spinner" style={{ width: 44, height: 44, flexShrink: 0 }}>
-              <Brain size={18} color="#22d3ee" />
-            </div>
+          {/* Station Selection Dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div>
-              <div style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-                Station Forecast Selection — {station.name}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
-                Experiment 9 Spatio-Temporal GNN (6h, 12h, 24h native anchors) · PCHIP Spline intermediate horizons
-              </div>
-            </div>
+              <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', display: 'block', fontWeight: 600 }}>
+                Forecast Station
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                <select
+                  value={selectedStationId}
+                  onChange={(e) => handleStationChange(e.target.value)}
+                  style={{
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--border-medium)',
+                    color: '#f8fafc',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    padding: '8px 14px',
+                    borderRadius: 6,
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {stations.map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.basin || 'Cauvery'})
+                    </option>
+                  ))}
+                </select>
 
-            {/* Station selector */}
-            <div style={{ marginLeft: 'auto', position: 'relative' }}>
-              <motion.button
-                className="btn btn-ghost"
-                style={{ fontSize: '0.82rem', padding: '8px 16px', gap: 8 }}
-                onClick={() => setShowDropdown(d => !d)}
-                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.95 }}
-              >
-                <span className={`status-dot status-${sc.label.toLowerCase() === 'safe' ? 'safe' : sc.label.toLowerCase() === 'warning' ? 'warning' : 'danger'}`} style={{ width: 7, height: 7 }} />
-                {station.name}
-                <motion.div animate={{ rotate: showDropdown ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                  <ChevronDown size={14} />
-                </motion.div>
-              </motion.button>
-
-              <AnimatePresence>
-                {showDropdown && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    style={{
-                      position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 200,
-                      background: 'rgba(8,18,40,0.98)', backdropFilter: 'blur(24px)',
-                      border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, overflow: 'hidden',
-                      boxShadow: '0 20px 60px rgba(0,0,0,0.7)', minWidth: 220,
-                      maxHeight: 300, overflowY: 'auto'
-                    }}
-                  >
-                    {stations.map(s => {
-                      const rawStatus = (s.risk_level || 'Safe').toLowerCase();
-                      const severity = rawStatus === 'severe flood' || rawStatus === 'high risk' ? 'danger' : rawStatus === 'moderate risk' ? 'warning' : rawStatus === 'low risk' ? 'alert' : 'safe';
-                      const ssc = STATUS_CONFIG[severity];
-                      return (
-                        <motion.div key={s.id}
-                          onClick={() => handleStationChange(s.id)}
-                          whileHover={{ background: 'rgba(34,211,238,0.05)' }}
-                          style={{
-                            padding: '10px 16px', cursor: 'pointer',
-                            borderBottom: '1px solid rgba(255,255,255,0.04)',
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            background: selectedStation === s.id ? 'rgba(34,211,238,0.06)' : 'transparent',
-                          }}
-                        >
-                          <span className={`status-dot status-${severity}`} style={{ width: 7, height: 7 }} />
-                          <span style={{ fontSize: '0.82rem', color: selectedStation === s.id ? '#22d3ee' : 'rgba(255,255,255,0.75)', fontWeight: selectedStation === s.id ? 600 : 400 }}>
-                            {s.name.replace(' Gauge', '').replace(' Reservoir', '')}
-                          </span>
-                          <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: ssc.color }}>{s.water_level.toFixed(1)}ft</span>
-                        </motion.div>
-                      );
-                    })}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                <button
+                  type="button"
+                  onClick={() => handleStationChange(selectedStationId)}
+                  disabled={isRefreshing}
+                  className="btn btn-sm btn-secondary"
+                  title="Re-run GNN Inference for this station"
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px' }}
+                >
+                  <RefreshCw size={13} className={isRefreshing ? 'spin' : ''} />
+                  <span>{isRefreshing ? 'Running...' : 'Re-infer'}</span>
+                </button>
+              </div>
             </div>
           </div>
-        </motion.div>
 
-        {/* Horizon selector */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
-          {HORIZONS_META.map((hm, i) => (
-            <motion.button
-              key={hm.h}
-              onClick={() => setActiveHorizon(hm.h)}
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + i * 0.06 }}
-              whileHover={{ y: -3 }} whileTap={{ scale: 0.94 }}
+          {/* Real-time Observed Stage Telemetry & Headroom */}
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>
+            <div>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>
+                Current Observed Stage
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.35rem', fontWeight: 700, color: '#f8fafc' }}>
+                {currentObservedLevel.toFixed(2)}{' '}
+                <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#94a3b8' }}>ft</span>
+              </span>
+            </div>
+
+            <div style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: 16 }}>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>
+                Warning / Danger
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', fontWeight: 600, color: '#e2e8f0' }}>
+                <span style={{ color: '#f59e0b' }}>{warningLevel.toFixed(1)}</span> /{' '}
+                <span style={{ color: '#ef4444' }}>{dangerLevel.toFixed(1)}</span>{' '}
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>ft</span>
+              </span>
+            </div>
+
+            <div style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: 16 }}>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', display: 'block' }}>
+                Clearance Headroom
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.15rem', fontWeight: 700, color: '#10b981' }}>
+                {currentClearance.toFixed(2)}{' '}
+                <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#6ee7b7' }}>ft to danger</span>
+              </span>
+            </div>
+
+            <div style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: 16 }}>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                Current Risk
+              </span>
+              <RiskBadge level={selectedStation.risk_level || 'Safe'} />
+            </div>
+          </div>
+        </div>
+
+        {/* 3 Native GNN Forecast Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {nativePredictions.map((pred) => (
+            <div
+              key={pred.horizon}
+              className="card"
               style={{
-                background: activeHorizon === hm.h ? `${hm.color}18` : 'rgba(10,22,50,0.6)',
-                border: `1.5px solid ${activeHorizon === hm.h ? hm.color + '50' : 'rgba(255,255,255,0.07)'}`,
-                borderRadius: 14, padding: '14px 12px', cursor: 'pointer', textAlign: 'center',
-                boxShadow: activeHorizon === hm.h ? `0 0 20px ${hm.color}30` : 'none',
-                backdropFilter: 'blur(16px)', transition: 'all 0.2s',
+                padding: '18px 20px',
+                position: 'relative',
+                overflow: 'hidden',
+                borderLeft: '4px solid #0ea5e9',
               }}
             >
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.3rem', fontWeight: 800, color: activeHorizon === hm.h ? hm.color : 'rgba(255,255,255,0.5)', lineHeight: 1 }}>
-                {hm.label}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Brain size={15} color="#0ea5e9" />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#38bdf8' }}>
+                    +{pred.horizon}h Forecast Horizon
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {pred.delta_ft != null && (
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        color: pred.delta_ft >= 0 ? '#38bdf8' : '#10b981',
+                        backgroundColor: pred.delta_ft >= 0 ? 'rgba(56, 189, 248, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                        border: `1px solid ${pred.delta_ft >= 0 ? 'rgba(56, 189, 248, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                        borderRadius: 4,
+                        padding: '2px 7px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                      }}
+                    >
+                      {pred.delta_ft >= 0 ? (
+                        <>
+                          <ArrowUpRight size={12} /> +{pred.delta_ft.toFixed(2)} ft
+                        </>
+                      ) : (
+                        <>
+                          <ArrowDownRight size={12} /> {pred.delta_ft.toFixed(2)} ft
+                        </>
+                      )}
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      fontSize: '0.64rem',
+                      color: '#10b981',
+                      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: 4,
+                      padding: '2px 6px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Native GNN Head
+                  </span>
+                </div>
               </div>
-              <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)', marginTop: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                {hm.desc}
-              </div>
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                {dynamicConfidenceMap[hm.h] != null ? (
-                  <>
-                    <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-                      <motion.div
-                        style={{ height: '100%', background: hm.color, borderRadius: 2, width: 0 }}
-                        animate={{ width: `${dynamicConfidenceMap[hm.h]}%` }}
-                        transition={{ delay: 0.3 + i * 0.06, duration: 1 }}
-                      />
-                    </div>
-                    <span style={{ fontSize: '0.62rem', color: hm.color, fontWeight: 700, whiteSpace: 'nowrap' }}>{dynamicConfidenceMap[hm.h]}%</span>
-                  </>
-                ) : (
-                  <span style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.3)' }}>{hm.isNative ? 'Exp 9 95% CI' : 'PCHIP Spline'}</span>
+
+              {/* Main Predicted Number */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '2rem',
+                    fontWeight: 700,
+                    color: '#f8fafc',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {pred.level_ft != null ? Number(pred.level_ft).toFixed(2) : '—'}
+                </span>
+                <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>ft</span>
+                {pred.level_m != null && (
+                  <span style={{ fontSize: '0.8rem', color: '#64748b', marginLeft: 4 }}>
+                    ({pred.level_m.toFixed(2)} m)
+                  </span>
                 )}
               </div>
-            </motion.button>
+
+              {/* 95% Confidence Interval & Uncertainty Range */}
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: '8px 10px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                  borderRadius: 6,
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '0.74rem',
+                }}
+              >
+                <span style={{ color: '#94a3b8' }}>
+                  95% Confidence Band:
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: '#e2e8f0', fontWeight: 600 }}>
+                  ±{pred.uncertainty_ft != null ? Number(pred.uncertainty_ft).toFixed(2) : '0.00'} ft
+                </span>
+              </div>
+
+              {/* Footer: Clearance Headroom & Severity */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: 12,
+                  fontSize: '0.74rem',
+                }}
+              >
+                <span style={{ color: '#94a3b8' }}>
+                  Remaining Headroom:{' '}
+                  <strong style={{ color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+                    {pred.clearance_ft != null ? pred.clearance_ft.toFixed(2) : '—'} ft
+                  </strong>
+                </span>
+                <RiskBadge level={pred.severity} size="sm" />
+              </div>
+            </div>
           ))}
         </div>
 
-        {/* Horizon explanation note */}
-        <div style={{
-          background: 'rgba(10,26,56,0.6)',
-          border: '1px solid rgba(34,211,238,0.15)',
-          borderRadius: 10,
-          padding: '9px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          fontSize: '0.75rem',
-          color: 'rgba(255,255,255,0.72)',
-          lineHeight: 1.4
-        }}>
-          <span style={{ color: '#22d3ee', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.66rem', letterSpacing: '0.06em', flexShrink: 0 }}>
-            HORIZON ARCHITECTURE:
-          </span>
-          <span>
-            Natively predicted horizons: <strong style={{ color: '#22d3ee' }}>6h</strong>, <strong style={{ color: '#22d3ee' }}>12h</strong> and <strong style={{ color: '#22d3ee' }}>24h</strong>. Intermediate <strong style={{ color: '#34d399' }}>1h</strong>, <strong style={{ color: '#34d399' }}>3h</strong> and <strong style={{ color: '#34d399' }}>18h</strong> views are generated by PCHIP interpolation between model forecast anchors.
-          </span>
-        </div>
-
-        {/* Main chart */}
-        <motion.div className="glass-card gradient-border" style={{ padding: '24px 28px' }}
-          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 10 }}>
-                {station.name}
-                <span className={`badge badge-${sc.label.toLowerCase() === 'safe' ? 'safe' : sc.label.toLowerCase() === 'warning' ? 'warning' : 'danger'}`} style={{ fontSize: '0.62rem' }}>
-                  <span className={`status-dot status-${sc.label.toLowerCase() === 'safe' ? 'safe' : sc.label.toLowerCase() === 'warning' ? 'warning' : 'danger'}`} style={{ width: 5, height: 5 }} />
-                  {sc.label}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>
-                {activeHorizon}h forecast · {hMeta.isNative ? 'Experiment 9 Native Horizon' : 'PCHIP Spline Interpolated'} · Model Uncertainty Confidence: {activeConfidence != null ? `${activeConfidence}%` : 'Active'} · Soil Moisture: {predictionData?.routing_metadata?.soil_moisture || 0.4}
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.6rem', fontWeight: 800, color: sc.color, lineHeight: 1 }}>{station.water_level?.toFixed(2)}ft</div>
-                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Current level</div>
-              </div>
-              <div style={{ width: 1, height: 36, background: 'rgba(255,255,255,0.08)' }} />
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.6rem', fontWeight: 800, color: hMeta.color, lineHeight: 1 }}>{predictedPeak?.toFixed(2)}ft</div>
-                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Predicted peak (+{activeHorizon}h)</div>
-              </div>
-            </div>
-          </div>
-
-          <ResponsiveContainer width="100%" height={320}>
-            <AreaChart data={series} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
-              <defs>
-                <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#22d3ee" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={hMeta.color} stopOpacity={0.3} />
-                  <stop offset="100%" stopColor={hMeta.color} stopOpacity={0.01} />
-                </linearGradient>
-                <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={hMeta.color} stopOpacity={0.12} />
-                  <stop offset="100%" stopColor={hMeta.color} stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} interval={11} />
-              <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={station.danger_level} stroke="#fb7185" strokeDasharray="6 4" strokeWidth={1.5}
-                label={{ value: `Danger ${station.danger_level.toFixed(1)}ft`, position: 'right', fontSize: 9, fill: '#fb7185' }} />
-
-              {/* Confidence interval */}
-              <Area type="monotone" dataKey="upper" stroke="none" fill="url(#ciGrad)" name="95% CI Upper (ft)" />
-              <Area type="monotone" dataKey="lower" stroke="none" fill="white" fillOpacity={0.01} name="95% CI Lower (ft)" />
-
-              {/* Observed */}
-              <Area type="monotone" dataKey="level" stroke="#22d3ee" strokeWidth={2.5}
-                fill="url(#actualGrad)" dot={false} name="Observed — Live (ft)"
-                animationDuration={1800} animationEasing="ease-out" />
-
-              {/* Forecast */}
-              <Area type="monotone" dataKey="forecast" stroke={hMeta.color} strokeWidth={2.2}
-                fill="url(#forecastGrad)" dot={false} name={`Exp 9 Forecast (+${activeHorizon}h)`}
-                strokeDasharray="7 3" animationDuration={2000} />
-            </AreaChart>
-          </ResponsiveContainer>
-
-          {/* Standardized Chart Legend */}
-          <div style={{ display: 'flex', gap: 20, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-            {[
-              { color: '#22d3ee', label: 'Observed (Live)', solid: true, isBox: false },
-              { color: hMeta.color, label: `Exp 9 Forecast (+${activeHorizon}h)`, solid: false, isBox: false },
-              { color: hMeta.color, label: '95% Prediction Interval', solid: true, isBox: true },
-              { color: '#fb7185', label: 'Danger Threshold', solid: false, isBox: false },
-            ].map(l => (
-              <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {l.isBox ? (
-                  <div style={{ width: 16, height: 8, background: `${l.color}25`, border: `1px solid ${l.color}60`, borderRadius: 2 }} />
-                ) : (
-                  <div style={{ width: 22, height: 2, background: l.color, borderRadius: 2, border: l.solid ? 'none' : `1px dashed ${l.color}` }} />
-                )}
-                <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)' }}>{l.label}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Alert */}
-        {(sc.label.toLowerCase() === 'warning' || sc.label.toLowerCase() === 'danger') && (
-          <motion.div
-            style={{ background: 'rgba(251,113,133,0.08)', border: '1px solid rgba(251,113,133,0.2)', borderRadius: 14, padding: '14px 20px', display: 'flex', alignItems: 'flex-start', gap: 12 }}
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+        {/* SECTION 1: DETAILED MULTI-HORIZON INUNDATION SCHEDULE TABLE */}
+        <div className="card" style={{ padding: '20px 22px' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12,
+              marginBottom: 16,
+            }}
           >
-            <motion.div animate={{ rotate: [0, -8, 8, -5, 5, 0] }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 4 }}>
-              <AlertTriangle size={18} color="#fb7185" />
-            </motion.div>
             <div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fb7185', marginBottom: 4 }}>High Risk Warning — {station.name}</div>
-              <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)', margin: 0, lineHeight: 1.6 }}>
-                AI forecast indicates danger threshold breach in approximately <strong style={{ color: '#fb7185' }}>{hoursToThreshold} hours</strong> {activeConfidence != null ? `at ${activeHorizon}h confidence (${activeConfidence}%)` : ''}.
-                Downstream communities should be placed on pre-emptive alert.
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Clock size={16} color="#0ea5e9" />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#f8fafc', margin: 0 }}>
+                  {selectedStation.name} — Multi-Horizon Inundation & Trajectory Schedule
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.76rem', color: '#94a3b8', margin: '4px 0 0' }}>
+                Continuous forward projections across 6 horizons generated by HydroGNN-Net Exp 9 neural heads & shape-preserving PCHIP interpolation
               </p>
             </div>
-          </motion.div>
-        )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem', color: '#64748b' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
+                Native GNN Heads (6h, 12h, 24h)
+              </span>
+              <span>·</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#0ea5e9', display: 'inline-block' }} />
+                PCHIP Spline (1h, 3h, 18h)
+              </span>
+            </div>
+          </div>
+
+          <div className="table-container" style={{ border: 'none', borderRadius: 6, overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Horizon Step</th>
+                  <th>Target Time</th>
+                  <th>Projected Stage</th>
+                  <th>Stage Delta</th>
+                  <th>95% Confidence Band</th>
+                  <th>Clearance to Danger</th>
+                  <th>Inundation Prob</th>
+                  <th>Risk Status</th>
+                  <th>Operational Action Advisory</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detailedSchedule.map((row) => (
+                  <tr key={row.horizon}>
+                    {/* Horizon Step */}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            color: row.isNative ? '#38bdf8' : '#cbd5e1',
+                            fontFamily: 'var(--font-mono)',
+                          }}
+                        >
+                          +{row.horizon}h
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.62rem',
+                            padding: '1px 5px',
+                            borderRadius: 3,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            backgroundColor: row.isNative ? 'rgba(16, 185, 129, 0.15)' : 'rgba(14, 165, 233, 0.12)',
+                            color: row.isNative ? '#34d399' : '#38bdf8',
+                            border: `1px solid ${row.isNative ? 'rgba(16, 185, 129, 0.3)' : 'rgba(14, 165, 233, 0.3)'}`,
+                          }}
+                        >
+                          {row.isNative ? 'Native' : 'Spline'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Target Time */}
+                    <td style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
+                      {row.timeStr}
+                    </td>
+
+                    {/* Projected Stage */}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#f8fafc', fontSize: '0.92rem' }}>
+                          {row.level_ft.toFixed(2)} ft
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                          ({row.level_m.toFixed(2)} m)
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Stage Delta */}
+                    <td>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 600,
+                          fontSize: '0.78rem',
+                          color: row.delta_ft > 0 ? '#38bdf8' : row.delta_ft < 0 ? '#10b981' : '#64748b',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 3,
+                        }}
+                      >
+                        {row.delta_ft > 0 ? (
+                          <>
+                            <ArrowUpRight size={13} /> +{row.delta_ft.toFixed(2)} ft
+                          </>
+                        ) : row.delta_ft < 0 ? (
+                          <>
+                            <ArrowDownRight size={13} /> {row.delta_ft.toFixed(2)} ft
+                          </>
+                        ) : (
+                          <>
+                            <Minus size={13} /> 0.00 ft
+                          </>
+                        )}
+                      </span>
+                    </td>
+
+                    {/* 95% Confidence Band */}
+                    <td>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: '#cbd5e1' }}>
+                        [{row.lower_ft.toFixed(2)} – {row.upper_ft.toFixed(2)} ft]
+                        <span style={{ color: '#64748b', marginLeft: 4 }}>
+                          (±{row.uncertainty_ft.toFixed(2)})
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Clearance to Danger */}
+                    <td>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 600,
+                          fontSize: '0.78rem',
+                          color: row.clearance_ft < 50 ? '#ef4444' : row.clearance_ft < 100 ? '#f59e0b' : '#10b981',
+                        }}
+                      >
+                        {row.clearance_ft.toFixed(2)} ft
+                      </span>
+                    </td>
+
+                    {/* Inundation Probability */}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div
+                          style={{
+                            flex: 1,
+                            minWidth: 45,
+                            height: 6,
+                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            borderRadius: 3,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${Math.min(100, Math.max(0, row.flood_prob_pct))}%`,
+                              height: '100%',
+                              backgroundColor:
+                                row.flood_prob_pct > 75
+                                  ? '#ef4444'
+                                  : row.flood_prob_pct > 40
+                                  ? '#f59e0b'
+                                  : '#10b981',
+                              borderRadius: 3,
+                            }}
+                          />
+                        </div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#94a3b8' }}>
+                          {row.flood_prob_pct}%
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Risk Status */}
+                    <td>
+                      <RiskBadge level={row.severity} size="sm" />
+                    </td>
+
+                    {/* Operational Advisory */}
+                    <td style={{ fontSize: '0.75rem', color: '#e2e8f0', maxWidth: 260 }}>
+                      {row.advisory}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* SECTION 2: BASIN-WIDE RIVER ROUTING CASCADE & VULNERABILITY MATRIX */}
+        <div className="card" style={{ padding: '20px 22px' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Navigation size={16} color="#0ea5e9" />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#f8fafc', margin: 0 }}>
+                  Basin-Wide River Routing Cascade & Vulnerability Matrix
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.76rem', color: '#94a3b8', margin: '4px 0 0' }}>
+                Key hydrological routing nodes along the Cauvery main stem, Bhavani, Amaravathi, and Vaigai reaches
+              </p>
+            </div>
+            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+              Click &quot;Inspect Forecast&quot; to change the active analysis station
+            </span>
+          </div>
+
+          <div className="table-container" style={{ border: 'none', borderRadius: 6, overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Station Name</th>
+                  <th>River Reach</th>
+                  <th>Current Level</th>
+                  <th>Danger Mark</th>
+                  <th>Capacity Utilization</th>
+                  <th>24h Rainfall</th>
+                  <th>Soil Saturation</th>
+                  <th>Current Status</th>
+                  <th>Quick Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stations.slice(0, 10).map((s: any) => {
+                  const isSelected = s.id === selectedStationId;
+                  const ratioPct = Math.min(100, Math.round(((s.water_level || 0) / (s.danger_level || 1)) * 100));
+                  return (
+                    <tr
+                      key={s.id}
+                      onClick={() => handleStationChange(s.id)}
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: isSelected ? 'rgba(14, 165, 233, 0.12)' : undefined,
+                      }}
+                    >
+                      <td style={{ fontWeight: 600, color: isSelected ? '#38bdf8' : '#f8fafc' }}>
+                        {s.name}
+                      </td>
+                      <td style={{ color: '#94a3b8' }}>{s.basin || 'Cauvery'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                        {Number(s.water_level || 0).toFixed(2)} ft
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: '#ef4444' }}>
+                        {Number(s.danger_level || 0).toFixed(1)} ft
+                      </td>
+                      <td style={{ minWidth: 120 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div
+                            style={{
+                              flex: 1,
+                              height: 6,
+                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                              borderRadius: 3,
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: `${ratioPct}%`,
+                                height: '100%',
+                                backgroundColor: ratioPct > 85 ? '#ef4444' : ratioPct > 60 ? '#f59e0b' : '#10b981',
+                                borderRadius: 3,
+                              }}
+                            />
+                          </div>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#94a3b8' }}>
+                            {ratioPct}%
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: '#94a3b8' }}>
+                        {Number(s.rain_observed || 0).toFixed(1)} mm
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: '#94a3b8' }}>
+                        {s.soil_moisture ? `${Math.round(s.soil_moisture * 100)}%` : '45%'}
+                      </td>
+                      <td>
+                        <RiskBadge level={s.risk_level || 'Safe'} size="sm" />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStationChange(s.id);
+                          }}
+                          className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ fontSize: '0.68rem', padding: '3px 8px', whiteSpace: 'nowrap' }}
+                        >
+                          {isSelected ? 'Active' : 'Inspect Forecast →'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* SECTION 3: HYDROLOGICAL FACTORS & GNN PHYSICS DIAGNOSTICS (GRID OF 4 CARDS) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          {/* Card 1: 24h Antecedent Rain */}
+          <div className="card" style={{ padding: '16px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', marginBottom: 8 }}>
+              <Droplets size={16} />
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase' }}>
+                24h Antecedent Rain
+              </span>
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.6rem', fontWeight: 700, color: '#f8fafc' }}>
+              {meta.rain_24h_mm != null ? meta.rain_24h_mm : Number(selectedStation.rain_observed || 0).toFixed(1)}{' '}
+              <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 400 }}>mm</span>
+            </div>
+            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '6px 0 0' }}>
+              Cumulative basin gauge precipitation feeding direct surface runoff
+            </p>
+          </div>
+
+          {/* Card 2: Soil Moisture Saturation */}
+          <div className="card" style={{ padding: '16px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#10b981', marginBottom: 8 }}>
+              <Compass size={16} />
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase' }}>
+                Soil Saturation Proxy
+              </span>
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.6rem', fontWeight: 700, color: '#f8fafc' }}>
+              {meta.soil_moisture != null ? Math.round(meta.soil_moisture * 100) : 45}%
+            </div>
+            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '6px 0 0' }}>
+              CN-based catchment retention index governing infiltration excess
+            </p>
+          </div>
+
+          {/* Card 3: Neural Model Architecture */}
+          <div className="card" style={{ padding: '16px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#a855f7', marginBottom: 8 }}>
+              <Cpu size={16} />
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase' }}>
+                Inference Architecture
+              </span>
+            </div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f8fafc', lineHeight: 1.3 }}>
+              HydroGNN-Net Exp 9
+            </div>
+            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '6px 0 0' }}>
+              GRU + GATv2 + GraphSAGE with Trend-Conditioned Residual Gating
+            </p>
+          </div>
+
+          {/* Card 4: Routing Law */}
+          <div className="card" style={{ padding: '16px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#f59e0b', marginBottom: 8 }}>
+              <Gauge size={16} />
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase' }}>
+                Hydrological Routing
+              </span>
+            </div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f8fafc', lineHeight: 1.3 }}>
+              Nash-Sutcliffe IUH
+            </div>
+            <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '6px 0 0' }}>
+              Conservation of volume with PCHIP C1-continuous spline interpolation
+            </p>
+          </div>
+        </div>
+
+        {/* SECTION 4: OPERATIONAL EARLY WARNING ACTION PROTOCOL */}
+        <div
+          style={{
+            padding: '16px 20px',
+            backgroundColor: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 14,
+          }}
+        >
+          <ShieldAlert size={20} color="#0ea5e9" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+            <strong style={{ color: '#f8fafc', display: 'block', marginBottom: 4 }}>
+              Operational Early Warning & Decision Support Protocol:
+            </strong>
+            When projected water stage approaches within 10% of Warning Level ({warningLevel.toFixed(1)} ft), river wardens are automatically alerted via the automated notification queue. If 24h trajectory forecasts breach Danger Level ({dangerLevel.toFixed(1)} ft), emergency sluice gate regulation protocols are initiated at upstream dams (Mettur / Bhavanisagar / Amaravathi).
+          </div>
+        </div>
       </div>
     </AppLayout>
   );

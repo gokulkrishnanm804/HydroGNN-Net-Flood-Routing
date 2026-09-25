@@ -1,69 +1,57 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Map, TrendingUp, Radio, Brain,
-  Bell, Database, FileText, ChevronLeft, Waves,
-  Activity, Settings, HelpCircle, GitBranch
+  LayoutDashboard,
+  Radio,
+  TrendingUp,
+  GitBranch,
+  Bell,
+  Brain,
+  FileText,
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  Waves,
 } from 'lucide-react';
-import styles from './Sidebar.module.css';
 import { api } from '../../services/api';
 
-const NAV_GROUPS = [
-  {
-    label: 'MONITORING',
-    items: [
-      { href: '/',         icon: LayoutDashboard, label: 'Dashboard',     desc: 'Real-time basin overview',          badge: null,  badgeVariant: null },
-      { href: '/map',      icon: Map,             label: 'Basin Map',     desc: 'Spatial river & station view',      badge: 'LIVE',badgeVariant: 'info' },
-      { href: '/forecast', icon: TrendingUp,      label: 'Forecast',      desc: '6–24h water-level prediction',      badge: '24h', badgeVariant: 'safe' },
-      { href: '/stations', icon: Radio,           label: 'Stations',      desc: 'Station-level monitoring',          badge: '8',   badgeVariant: null },
-      { href: '/routing',  icon: GitBranch,       label: 'Flood Routing', desc: 'River flow propagation',             badge: 'NEW', badgeVariant: 'warning' },
-    ],
-  },
-  {
-    label: 'INTELLIGENCE',
-    items: [
-      { href: '/model',    icon: Brain,    label: 'AI Model',      desc: 'Experiment 9 model & performance',  badge: null, badgeVariant: null },
-      { href: '/alerts',   icon: Bell,     label: 'Alerts',        desc: 'Flood warnings & events',            badge: '0',  badgeVariant: 'safe' },
-      { href: '/pipeline', icon: Database, label: 'Data Pipeline', desc: 'Data sources & freshness',           badge: null, badgeVariant: null },
-      { href: '/reports',  icon: FileText, label: 'Reports',       desc: 'Evaluation & system reports',        badge: null, badgeVariant: null },
-    ],
-  },
+interface SidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+const NAV_ITEMS = [
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/stations', label: 'Stations', icon: Radio },
+  { href: '/forecast', label: 'Forecast', icon: TrendingUp },
+  { href: '/routing', label: 'Flood Routing', icon: GitBranch },
+  { href: '/alerts', label: 'Alerts', icon: Bell, badge: true },
+  { href: '/model', label: 'Model', icon: Brain },
+  { href: '/reports', label: 'Reports', icon: FileText },
+  { href: '/diagnostics', label: 'System / Diagnostics', icon: Activity },
 ];
 
-const BOTTOM_ITEMS = [
-  { href: '/settings', icon: Settings,   label: 'Settings', desc: 'System configuration' },
-  { href: '/help',     icon: HelpCircle, label: 'Help',     desc: 'System guide & terminology' },
-];
-
-const BADGE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
-  info:    { bg: 'rgba(34,211,238,0.15)',   color: '#22d3ee',  border: 'rgba(34,211,238,0.25)' },
-  safe:    { bg: 'rgba(52,211,153,0.15)',   color: '#34d399',  border: 'rgba(52,211,153,0.25)' },
-  warning: { bg: 'rgba(251,146,60,0.15)',   color: '#fb923c',  border: 'rgba(251,146,60,0.25)' },
-  danger:  { bg: 'rgba(251,113,133,0.15)',  color: '#fb7185',  border: 'rgba(251,113,133,0.25)' },
-};
-
-export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
-  const [alertCount, setAlertCount] = useState<number | null>(null);
+  const [activeAlertCount, setActiveAlertCount] = useState<number>(0);
 
   useEffect(() => {
     let isMounted = true;
-    const fetchAlertCount = async () => {
+    const loadAlerts = async () => {
       try {
         await api.login();
-        const logs = await api.getAlerts();
-        if (isMounted && Array.isArray(logs)) {
-          setAlertCount(logs.length);
+        const alerts = await api.getAlerts();
+        if (isMounted && Array.isArray(alerts)) {
+          setActiveAlertCount(alerts.length);
         }
-      } catch (err) {
-        if (isMounted) setAlertCount(0);
+      } catch {
+        // Silently handle
       }
     };
-    fetchAlertCount();
-    const interval = setInterval(fetchAlertCount, 15000);
+    loadAlerts();
+    const interval = setInterval(loadAlerts, 30000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -71,225 +59,155 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
   }, []);
 
   return (
-    <motion.aside
-      className={styles.sidebar}
-      animate={{ width: collapsed ? 72 : 264 }}
-      transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+    <aside
+      style={{
+        width: collapsed ? 68 : 240,
+        backgroundColor: '#0a1020',
+        borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+        height: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'width 0.2s ease',
+        userSelect: 'none',
+      }}
     >
-      {/* Top accent line */}
-      <div className={styles.accentLine} />
-
-      {/* Logo */}
-      <div className={styles.logo}>
-        <motion.div
-          className={styles.logoIcon}
-          whileHover={{ scale: 1.08, rotate: 5 }}
-          whileTap={{ scale: 0.92 }}
-          transition={{ type: 'spring', stiffness: 400 }}
+      {/* Brand Header */}
+      <div
+        style={{
+          height: 58,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          padding: collapsed ? '0' : '0 16px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        }}
+      >
+        <Link
+          href="/"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            textDecoration: 'none',
+            color: '#f8fafc',
+          }}
         >
-          <Waves size={20} color="#22d3ee" />
-          {/* Animated glow ring */}
-          <div className={styles.logoGlow} />
-        </motion.div>
-
-        <AnimatePresence>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 6,
+              backgroundColor: '#0ea5e9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Waves size={18} color="#ffffff" />
+          </div>
           {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-              className={styles.logoText}
-            >
-              <span className={styles.logoTitle}>HydroGNN</span>
-              <span className={styles.logoSub}>Gov. Decision Support</span>
-            </motion.div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.92rem', letterSpacing: '0.02em', lineHeight: 1.2 }}>
+                HydroGNN-Net
+              </span>
+              <span style={{ fontSize: '0.66rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Cauvery Flood Routing
+              </span>
+            </div>
           )}
-        </AnimatePresence>
-
-        <motion.button
-          className={styles.collapseBtn}
-          onClick={onToggle}
-          whileHover={{ scale: 1.15, backgroundColor: 'rgba(34,211,238,0.12)' }}
-          whileTap={{ scale: 0.88 }}
-          animate={{ rotate: collapsed ? 180 : 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <ChevronLeft size={14} />
-        </motion.button>
+        </Link>
       </div>
 
-      {/* System status chip */}
-      <AnimatePresence>
-        {!collapsed && (
-          <motion.div
-            className={styles.statusChip}
-            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className={styles.statusDotLive} />
-            <span className={styles.statusLabel}>SYSTEM OPERATIONAL</span>
-            <span className={styles.statusVersion}>v2.4.1</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Navigation Links */}
+      <nav
+        style={{
+          flex: 1,
+          padding: '12px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3,
+          overflowY: 'auto',
+        }}
+      >
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
 
-      {/* Navigation */}
-      <nav className={styles.nav}>
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label} className={styles.navGroup}>
-            <AnimatePresence>
-              {!collapsed && (
-                <motion.p
-                  className={styles.groupLabel}
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={collapsed ? item.label : undefined}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: collapsed ? '9px 0' : '8px 12px',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                borderRadius: 6,
+                textDecoration: 'none',
+                color: isActive ? '#f8fafc' : '#94a3b8',
+                backgroundColor: isActive ? 'rgba(14, 165, 233, 0.14)' : 'transparent',
+                border: `1px solid ${isActive ? 'rgba(14, 165, 233, 0.28)' : 'transparent'}`,
+                fontWeight: isActive ? 600 : 400,
+                fontSize: '0.82rem',
+                transition: 'all 0.12s ease',
+              }}
+            >
+              <Icon size={17} color={isActive ? '#38bdf8' : '#94a3b8'} style={{ flexShrink: 0 }} />
+              {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+              {!collapsed && item.badge && activeAlertCount > 0 && (
+                <span
+                  style={{
+                    backgroundColor: '#ef4444',
+                    color: '#ffffff',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    padding: '1px 6px',
+                    borderRadius: 9999,
+                  }}
                 >
-                  {group.label}
-                </motion.p>
+                  {activeAlertCount}
+                </span>
               )}
-            </AnimatePresence>
-
-            {group.items.map((item) => {
-              const active = pathname === item.href;
-              const isAlertsItem = item.href === '/alerts';
-              const displayBadge = isAlertsItem
-                ? (alertCount !== null ? String(alertCount) : '0')
-                : item.badge;
-              const displayVariant = isAlertsItem
-                ? ((alertCount || 0) > 0 ? 'danger' : 'safe')
-                : item.badgeVariant;
-              const badgeStyle = displayVariant ? BADGE_COLORS[displayVariant] : null;
-              const tooltipText = `${item.label} — ${item.desc}`;
-              return (
-                <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
-                  <motion.div
-                    className={`${styles.navItem} ${active ? styles.navItemActive : ''}`}
-                    whileHover={{ x: collapsed ? 0 : 3 }}
-                    whileTap={{ scale: 0.97 }}
-                    transition={{ duration: 0.12 }}
-                    title={collapsed ? tooltipText : undefined}
-                    data-tooltip={collapsed ? tooltipText : undefined}
-                  >
-                    {active && (
-                      <motion.div
-                        className={styles.activeBar}
-                        layoutId="activeNavBar"
-                        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                      />
-                    )}
-
-                    {active && (
-                      <motion.div className={styles.activeGlow} layoutId="activeGlow" />
-                    )}
-
-                    <motion.div
-                      className={styles.navIcon}
-                      animate={{ color: active ? '#22d3ee' : 'rgba(255,255,255,0.42)' }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <item.icon size={17} strokeWidth={active ? 2.2 : 1.8} />
-                    </motion.div>
-
-                    <AnimatePresence>
-                      {!collapsed && (
-                        <motion.div
-                          className={styles.navTextCol}
-                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          <span
-                            className={styles.navLabel}
-                            style={{ color: active ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.7)' }}
-                          >
-                            {item.label}
-                          </span>
-                          <span className={styles.navDesc}>
-                            {item.desc}
-                          </span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    <AnimatePresence>
-                      {!collapsed && displayBadge && badgeStyle && (
-                        <motion.span
-                          className={styles.navBadge}
-                          style={{ background: badgeStyle.bg, color: badgeStyle.color, border: `1px solid ${badgeStyle.border}` }}
-                          initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-                        >
-                          {displayBadge}
-                        </motion.span>
-                      )}
-                      {!collapsed && displayBadge && !badgeStyle && (
-                        <motion.span
-                          className={styles.navBadge}
-                          style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}
-                          initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-                        >
-                          {displayBadge}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+            </Link>
+          );
+        })}
       </nav>
 
-      {/* Bottom section */}
-      <div className={styles.bottom}>
-        <div className={styles.dividerLine} />
-
-        {BOTTOM_ITEMS.map(item => (
-          <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
-            <motion.div
-              className={styles.navItem}
-              whileHover={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
-              title={collapsed ? `${item.label} — ${item.desc}` : undefined}
-              data-tooltip={collapsed ? `${item.label} — ${item.desc}` : undefined}
-            >
-              <div className={styles.navIcon} style={{ color: 'rgba(255,255,255,0.28)' }}>
-                <item.icon size={16} strokeWidth={1.7} />
-              </div>
-              <AnimatePresence>
-                {!collapsed && (
-                  <motion.div
-                    className={styles.navTextCol}
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  >
-                    <span className={styles.navLabel} style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>
-                      {item.label}
-                    </span>
-                    <span className={styles.navDesc}>
-                      {item.desc}
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          </Link>
-        ))}
-
-        {/* User card */}
-        <AnimatePresence>
-          {!collapsed && (
-            <motion.div className={styles.userCard}
-              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className={styles.avatar}>GK</div>
-              <div className={styles.userInfo}>
-                <div className={styles.userName}>Gokul K.</div>
-                <div className={styles.userRole}>Research Engineer</div>
-              </div>
-              <div className={styles.userOnline}>
-                <Activity size={12} color="#34d399" />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Collapse Footer */}
+      <div
+        style={{
+          padding: 8,
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          display: 'flex',
+          justifyContent: collapsed ? 'center' : 'flex-end',
+        }}
+      >
+        <button
+          onClick={onToggle}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            color: '#94a3b8',
+            width: 28,
+            height: 28,
+            borderRadius: 4,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+        </button>
       </div>
-    </motion.aside>
+    </aside>
   );
 }

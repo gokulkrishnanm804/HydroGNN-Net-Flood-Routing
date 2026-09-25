@@ -1,207 +1,144 @@
 'use client';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
-import { Bell, Search, RefreshCw, Wifi, ChevronDown, X } from 'lucide-react';
-import styles from './TopBar.module.css';
+import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { RefreshCw, CheckCircle, Clock } from 'lucide-react';
 import { api } from '../../services/api';
 
-const BREADCRUMBS: Record<string, { label: string; sub: string }> = {
-  '/':              { label: 'Dashboard',      sub: 'Real-time basin overview' },
-  '/map':           { label: 'Basin Map',      sub: 'Spatial river & station view' },
-  '/basin-map':     { label: 'Basin Map',      sub: 'Spatial river & station view' },
-  '/forecast':      { label: 'Flood Forecast', sub: '6–24h water-level prediction' },
-  '/stations':      { label: 'Stations',       sub: 'Station-level monitoring' },
-  '/routing':       { label: 'Flood Routing',  sub: 'River flow propagation' },
-  '/flood-routing': { label: 'Flood Routing',  sub: 'River flow propagation' },
-  '/model':         { label: 'AI Model',       sub: 'Experiment 9 model & performance' },
-  '/alerts':        { label: 'Alerts',         sub: 'Flood warnings & events' },
-  '/pipeline':      { label: 'Data Pipeline',  sub: 'Data sources & freshness' },
-  '/data-pipeline': { label: 'Data Pipeline',  sub: 'Data sources & freshness' },
-  '/reports':       { label: 'Reports',        sub: 'Evaluation & system reports' },
-  '/settings':      { label: 'Settings',       sub: 'System configuration' },
-  '/help':          { label: 'Help',           sub: 'System guide & terminology' },
+const PAGE_META: Record<string, { title: string; desc: string }> = {
+  '/': { title: 'Basin Monitoring Overview', desc: 'Real-time telemetry and flood risk status across the Cauvery River Basin' },
+  '/stations': { title: 'Station Monitoring', desc: 'Observed stages and operational threshold tracking for monitored gauges' },
+  '/forecast': { title: 'HydroGNN-Net Forecast', desc: 'Native 6h, 12h, and 24h multi-horizon water-level predictions with uncertainty' },
+  '/routing': { title: 'Flood Wave Routing', desc: 'Upstream-to-downstream topological flood propagation and reach travel timing' },
+  '/alerts': { title: 'Flood Warning Center', desc: 'Actionable hydrological hazard notices and advisory actions' },
+  '/model': { title: 'AI Model & Verification', desc: 'Spatio-Temporal Graph Neural Network architecture and held-out test evaluation' },
+  '/reports': { title: 'Basin Operational Reports', desc: 'Executive summaries and station monitoring bulletins' },
+  '/diagnostics': { title: 'System & Diagnostics', desc: 'Backend health, model loader verification, and data ingestion freshness' },
 };
 
 export default function TopBar() {
-  const [mounted, setMounted] = useState(false);
-  const [time, setTime] = useState<Date | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [path, setPath] = useState('/');
-  const [showAlerts, setShowAlerts] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [activeAlerts, setActiveAlerts] = useState<any[]>([]);
+  const pathname = usePathname();
+  const [istTime, setIstTime] = useState<string>('');
+  const [modelStatus, setModelStatus] = useState<string>('Checking...');
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   useEffect(() => {
-    setMounted(true);
-    setTime(new Date());
-    const t = setInterval(() => setTime(new Date()), 1000);
-    if (typeof window !== 'undefined') setPath(window.location.pathname);
-    
-    let isMounted = true;
-    const fetchLiveAlerts = async () => {
-      try {
-        await api.login();
-        const logs = await api.getAlerts();
-        if (isMounted && Array.isArray(logs)) {
-          setActiveAlerts(logs);
-        }
-      } catch (err) {
-        if (isMounted) setActiveAlerts([]);
-      }
+    const updateTime = () => {
+      const now = new Date();
+      const options: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      };
+      setIstTime(new Intl.DateTimeFormat('en-IN', options).format(now) + ' IST');
     };
-    fetchLiveAlerts();
-    const alertInterval = setInterval(fetchLiveAlerts, 15000);
 
-    return () => {
-      clearInterval(t);
-      clearInterval(alertInterval);
-      isMounted = false;
-    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const meta = BREADCRUMBS[path] ?? BREADCRUMBS['/'];
+  useEffect(() => {
+    let isMounted = true;
+    const checkHealth = async () => {
+      try {
+        const health = await api.getHealth();
+        if (isMounted) {
+          setModelStatus(health.model_status === 'Loaded' ? 'Exp 9 Active (CPU)' : health.model_status);
+        }
+      } catch {
+        if (isMounted) setModelStatus('Backend Offline');
+      }
+    };
+    checkHealth();
+  }, []);
 
-  const handleSync = () => {
-    setSyncing(true);
-    setTimeout(() => setSyncing(false), 2200);
+  const meta = PAGE_META[pathname] || { title: 'HydroGNN-Net', desc: 'Cauvery River Flood Routing' };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    window.location.reload();
   };
 
   return (
-    <motion.header
-      className={styles.topbar}
-      initial={{ y: -64, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+    <header
+      style={{
+        height: 58,
+        backgroundColor: '#0a1020',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 24px',
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
     >
-      {/* Left — page info */}
-      <div className={styles.left}>
-        <div className={styles.pageInfo}>
-          <div className={styles.pageName}>{meta.label}</div>
-          <div className={styles.pageSub}>{meta.sub}</div>
-        </div>
-
-        {/* Live indicator */}
-        <motion.div className={styles.livePill} whileHover={{ scale: 1.04 }}>
-          <div className={styles.liveDot} />
-          <span>LIVE</span>
-        </motion.div>
+      {/* Page Title & Breadcrumb */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <h1 style={{ fontSize: '0.98rem', fontWeight: 600, color: '#f8fafc', margin: 0, lineHeight: 1.2 }}>
+          {meta.title}
+        </h1>
+        <span style={{ fontSize: '0.72rem', color: '#94a3b8', lineHeight: 1.2 }}>
+          {meta.desc}
+        </span>
       </div>
 
-      {/* Right — controls */}
-      <div className={styles.right}>
-
-        {/* Search */}
-        <motion.div
-          className={styles.searchWrap}
-          animate={{ width: searchFocused ? 260 : 200 }}
-          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+      {/* Right Actions / System Status */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* Model Status Pill */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+            border: '1px solid rgba(16, 185, 129, 0.22)',
+            borderRadius: 4,
+            padding: '3px 9px',
+            fontSize: '0.72rem',
+            color: '#10b981',
+            fontWeight: 500,
+          }}
         >
-          <Search size={13} style={{ flexShrink: 0, color: searchFocused ? '#22d3ee' : 'rgba(255,255,255,0.25)' }} />
-          <input
-            className={styles.searchInput}
-            placeholder="Search stations, events…"
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-          />
-          <AnimatePresence>
-            {searchFocused && (
-              <motion.kbd initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className={styles.kbdHint}
-              >ESC</motion.kbd>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Sync */}
-        <motion.button
-          className={styles.iconBtn}
-          onClick={handleSync}
-          whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.88 }}
-          data-tooltip="Sync all feeds"
-        >
-          <motion.div
-            animate={{ rotate: syncing ? 360 : 0 }}
-            transition={{ duration: 0.9, repeat: syncing ? Infinity : 0, ease: 'linear' }}
-          >
-            <RefreshCw size={14} color={syncing ? '#22d3ee' : 'rgba(255,255,255,0.45)'} />
-          </motion.div>
-        </motion.button>
-
-        {/* Alerts bell */}
-        <div className={styles.alertWrap}>
-          <motion.button
-            className={styles.iconBtn}
-            onClick={() => setShowAlerts(s => !s)}
-            whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.88 }}
-          >
-            <motion.div animate={{ rotate: showAlerts ? [0, -12, 12, -8, 8, 0] : 0 }} transition={{ duration: 0.5 }}>
-              <Bell size={14} color={showAlerts ? '#fb7185' : 'rgba(255,255,255,0.45)'} />
-            </motion.div>
-            <span className={styles.alertBadge}>{activeAlerts.length}</span>
-          </motion.button>
-
-          <AnimatePresence>
-            {showAlerts && (
-              <motion.div
-                className={styles.alertDropdown}
-                initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                transition={{ duration: 0.18 }}
-              >
-                <div className={styles.dropdownHeader}>
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>Active Alerts ({activeAlerts.length})</span>
-                  <motion.button whileHover={{ scale: 1.1 }} onClick={() => setShowAlerts(false)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}
-                  ><X size={14} /></motion.button>
-                </div>
-                {activeAlerts.length > 0 ? (
-                  activeAlerts.slice(0, 5).map((a, idx) => {
-                    const status = (a.severity || 'WARNING').toLowerCase() === 'critical' ? 'danger' : (a.severity || 'WARNING').toLowerCase() === 'warning' ? 'warning' : 'alert';
-                    return (
-                      <div key={a.id || idx} className={styles.dropdownItem}>
-                        <span className={`status-dot status-${status}`} style={{ width: 6, height: 6, flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{a.station_name || 'System'}</div>
-                          <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>{a.message}</div>
-                        </div>
-                        <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.28)', whiteSpace: 'nowrap' }}>{a.timestamp ? a.timestamp.split(' ')[1] : 'Live'}</span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div style={{ padding: '16px 20px', textAlign: 'center', fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)' }}>
-                    No active alerts to display
-                  </div>
-                )}
-                <a href="/alerts" style={{ display: 'block', textAlign: 'center', padding: '10px', fontSize: '0.75rem', color: '#22d3ee', textDecoration: 'none', borderTop: '1px solid rgba(255,255,255,0.06)', fontWeight: 500 }}>
-                  View all alerts →
-                </a>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <CheckCircle size={12} color="#10b981" />
+          <span>{modelStatus}</span>
         </div>
 
-        {/* Connection status */}
-        <motion.div className={styles.connPill} whileHover={{ scale: 1.03 }}>
-          <Wifi size={12} color="#34d399" />
-          <span>Connected</span>
-        </motion.div>
-
-        {/* Clock */}
-        <div className={styles.clock}>
-          <div className={styles.clockTime}>
-            {mounted && time
-              ? time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-              : '--:--:--'}
-          </div>
-          <div className={styles.clockDate}>
-            {mounted && time
-              ? time.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-              : '-- --- ----'}
-          </div>
+        {/* IST Clock */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            fontSize: '0.74rem',
+            color: '#94a3b8',
+            fontFamily: 'var(--font-mono)',
+            padding: '3px 8px',
+            backgroundColor: 'rgba(255, 255, 255, 0.03)',
+            borderRadius: 4,
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+          }}
+        >
+          <Clock size={12} color="#64748b" />
+          <span>{istTime || 'Loading time...'}</span>
         </div>
+
+        {/* Refresh Button */}
+        <button
+          onClick={handleRefresh}
+          className="btn btn-secondary btn-sm"
+          title="Refresh real-time data"
+          style={{ padding: '4px 9px' }}
+        >
+          <RefreshCw size={12} className={isRefreshing ? 'spin' : ''} />
+          <span style={{ fontSize: '0.72rem' }}>Refresh</span>
+        </button>
       </div>
-    </motion.header>
+    </header>
   );
 }

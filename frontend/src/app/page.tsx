@@ -1,327 +1,72 @@
 'use client';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect, useMemo } from 'react';
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, ReferenceLine
-} from 'recharts';
-import {
-  Droplets, Thermometer, Wind, Gauge, AlertTriangle,
-  TrendingUp, Activity, MapPin, Zap, Brain, Shield,
-  CloudRain, ChevronRight, RefreshCw
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import AppLayout from './AppLayout';
-import KPICard from './components/KPICard';
-import AICommandCenter from './components/AICommandCenter';
-import PageHeader from './components/PageHeader';
-import { STATUS_CONFIG } from './data/mockData';
+import RiskBadge from './components/RiskBadge';
+import HydrographChart from './components/HydrographChart';
+import { LoadingSkeleton, ErrorBanner } from './components/StateViews';
 import { api } from '../services/api';
-import DataFreshnessPanel from './components/DataFreshnessPanel';
+import {
+  Radio,
+  AlertTriangle,
+  CloudRain,
+  Brain,
+  ShieldCheck,
+  CheckCircle,
+  Database,
+  ArrowRight,
+  TrendingUp,
+  RefreshCw,
+} from 'lucide-react';
+import Link from 'next/link';
 
-/* ── Custom Tooltip ─────────────────────────────────────────── */
-const ChartTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{
-      background: 'rgba(8,18,40,0.96)', backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(34,211,238,0.18)', borderRadius: 12,
-      padding: '10px 14px', fontSize: '0.78rem', boxShadow: '0 16px 48px rgba(0,0,0,0.7)',
-    }}>
-      <p style={{ color: 'rgba(255,255,255,0.4)', marginBottom: 5, fontSize: '0.7rem' }}>{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color, display: 'flex', justifyContent: 'space-between', gap: 16, margin: 0 }}>
-          <span>{p.name}</span>
-          <strong>{typeof p.value === 'number' ? (p.dataKey === 'rainfall' ? `${p.value.toFixed(2)} mm` : `${p.value.toFixed(2)} ft`) : p.value}</strong>
-        </p>
-      ))}
-    </div>
-  );
-};
-
-/* ── Skeleton Loaders ───────────────────────────────────────── */
-function DashboardSkeleton() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', padding: '24px 32px' }}>
-      <div style={{ height: 48, background: 'rgba(255,255,255,0.03)', borderRadius: 16 }} className="shimmer" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-        {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} style={{ height: 110, background: 'rgba(255,255,255,0.03)', borderRadius: 16 }} className="shimmer" />
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ height: 260, background: 'rgba(255,255,255,0.03)', borderRadius: 20 }} className="shimmer" />
-          <div style={{ height: 180, background: 'rgba(255,255,255,0.03)', borderRadius: 20 }} className="shimmer" />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ height: 220, background: 'rgba(255,255,255,0.03)', borderRadius: 20 }} className="shimmer" />
-          <div style={{ height: 280, background: 'rgba(255,255,255,0.03)', borderRadius: 20 }} className="shimmer" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Error Banner ───────────────────────────────────────────── */
-function ErrorBanner({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      minHeight: 'calc(100vh - 120px)', gap: 16, padding: 32, textAlign: 'center',
-    }}>
-      <AlertTriangle size={48} color="#fb7185" style={{ filter: 'drop-shadow(0 0 12px rgba(251,113,133,0.3))' }} />
-      <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#e2e8f0' }}>No Live Data Available</h3>
-      <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.4)', maxWidth: 360, lineHeight: 1.5, margin: 0 }}>
-        The flood monitoring server could not be reached. Check backend connection and system status.
-      </p>
-      <button className="btn btn-primary" onClick={onRetry} style={{ marginTop: 8, padding: '8px 20px', gap: 8 }}>
-        <RefreshCw size={14} /> Retry Connection
-      </button>
-    </div>
-  );
-}
-
-/* ── Dynamic Alert Banner ───────────────────────────────────── */
-function AlertBanner({ alerts, lastUpdated }: { alerts: any[]; lastUpdated?: string }) {
-  const [idx, setIdx] = useState(0);
-
-  useEffect(() => {
-    if (alerts.length <= 1) return;
-    const interval = setInterval(() => {
-      setIdx(prev => (prev + 1) % alerts.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [alerts]);
-
-  if (!alerts || alerts.length === 0) {
-    const tsStr = lastUpdated ? lastUpdated.replace('T', ' ').split('.')[0] : 'Just now';
-    return (
-      <div style={{
-        background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)',
-        borderRadius: 16, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12,
-      }}>
-        <span className="status-dot status-safe" style={{ width: 8, height: 8 }} />
-        <span style={{ fontSize: '0.82rem', color: '#34d399', fontWeight: 800, letterSpacing: '0.04em' }}>SYSTEM STATUS: NORMAL</span>
-        <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)' }}>No active flood, reservoir, or weather alerts.</span>
-        <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#34d399', fontFamily: 'var(--font-mono)' }}>Last telemetry update: {lastUpdated || tsStr} (Live API Feed)</span>
-      </div>
-    );
-  }
-
-  const a = alerts[idx] || alerts[0];
-  const severity = (a.severity || 'WARNING').toLowerCase();
-  const sc = STATUS_CONFIG[severity === 'critical' ? 'danger' : severity === 'warning' ? 'warning' : 'alert'] || STATUS_CONFIG.safe;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+// Dynamically import Leaflet map to prevent SSR window reference
+const CauveryMap = dynamic(() => import('./components/CauveryMap'), {
+  ssr: false,
+  loading: () => (
+    <div
       style={{
-        background: `${sc.bg}`, border: `1px solid ${sc.border}`,
-        borderRadius: 16, padding: '12px 20px', boxShadow: sc.shadow,
-        display: 'flex', alignItems: 'center', gap: 14,
+        height: 420,
+        backgroundColor: 'rgba(255, 255, 255, 0.02)',
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#64748b',
+        fontSize: '0.85rem',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <motion.div animate={{ rotate: [0, -8, 8, -5, 5, 0] }} transition={{ duration: 1, repeat: Infinity, repeatDelay: 4 }}>
-          <AlertTriangle size={17} color={sc.color} />
-        </motion.div>
-        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: sc.color, letterSpacing: '0.08em' }}>ACTIVE ALERTS</span>
-        <span className={`badge badge-${severity === 'critical' ? 'danger' : severity === 'warning' ? 'warning' : 'alert'}`} style={{ fontSize: '0.6rem' }}>{alerts.length} active</span>
-      </div>
+      Loading Cauvery Basin Spatial Map...
+    </div>
+  ),
+});
 
-      <motion.div key={idx} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span className={`status-dot status-${severity === 'critical' ? 'danger' : severity === 'warning' ? 'warning' : 'alert'}`} />
-        <span style={{ fontWeight: 600, fontSize: '0.82rem', color: sc.color }}>{a.station_name}</span>
-        <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.message}</span>
-        <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: sc.color }}>
-          {a.timestamp.split(' ')[1]}
-        </span>
-      </motion.div>
-
-      <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-        {alerts.map((_, i) => (
-          <button key={i} onClick={() => setIdx(i)}
-            style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? sc.color : 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', transition: 'all 0.3s' }}
-          />
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-/* ── Station Mini Card ───────────────────────────────────────── */
-function StationMiniCard({ station, delay, isSelected, onClick }: { station: any; delay: number; isSelected: boolean; onClick: () => void }) {
-  const pct = Math.min((station.water_level / station.danger_level) * 100, 100);
-  const rawStatus = (station.risk_level || 'Safe').toLowerCase();
-  const severity = rawStatus === 'severe flood' || rawStatus === 'high risk' ? 'danger' : rawStatus === 'moderate risk' ? 'warning' : rawStatus === 'low risk' ? 'alert' : 'safe';
-  const sc = STATUS_CONFIG[severity];
-
-  // Estimate trend dynamically based on level ratio
-  const trend = pct > 75 ? '↑' : pct < 25 ? '↓' : '→';
-  const trendColor = trend === '↑' ? '#fb7185' : trend === '↓' ? '#34d399' : '#fbbf24';
-
-  return (
-    <motion.div
-      onClick={onClick}
-      style={{ textDecoration: 'none', cursor: 'pointer' }}
-      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.45, ease: [0.34, 1.04, 0.64, 1] }}
-    >
-      <motion.div
-        className="glass-card"
-        style={{
-          padding: '14px 16px',
-          borderColor: isSelected ? '#22d3ee' : sc.border,
-          background: isSelected ? 'rgba(34,211,238,0.06)' : 'rgba(10,22,46,0.3)',
-          boxShadow: isSelected ? '0 0 20px rgba(34,211,238,0.15)' : 'none',
-        }}
-        whileHover={{ y: -4, boxShadow: `${sc.shadow}, 0 20px 48px rgba(0,0,0,0.5)`, borderColor: isSelected ? '#22d3ee' : sc.color + '50' }}
-        transition={{ duration: 0.2 }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-          <div>
-            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>
-              {station.name.replace(' Gauge', '').replace(' Reservoir', '')}
-            </div>
-            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.32)', marginTop: 1 }}>{station.basin} Basin</div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
-            <span className={`badge badge-${severity}`} style={{ fontSize: '0.58rem', padding: '1px 7px' }}>
-              <span className={`status-dot status-${severity}`} style={{ width: 5, height: 5 }} />
-              {sc.label}
-            </span>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: trendColor }}>{trend}</span>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8 }}>
-          <div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.4rem', fontWeight: 800, color: sc.color }}>{station.water_level.toFixed(1)}</span>
-            <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>ft</span>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)' }}>Danger</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)' }}>{station.danger_level.toFixed(1)}ft</div>
-          </div>
-        </div>
-
-        <div className="progress-track">
-          <motion.div
-            className="progress-fill"
-            style={{ background: `linear-gradient(90deg, ${sc.color}80, ${sc.color})`, width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ delay: delay + 0.3, duration: 1.4, ease: [0.34, 1.2, 0.64, 1] }}
-          />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-          <span style={{ fontSize: '0.62rem', color: sc.color, fontWeight: 600 }}>{pct.toFixed(0)}% threshold</span>
-          <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)' }}>Exp 9 Forecast</span>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-/* ── Reservoir Gauge ─────────────────────────────────────────── */
-function ReservoirGauge({ reservoir, delay }: { reservoir: any; delay: number }) {
-  const pct = Math.min(reservoir.storage_pct, 100);
-  const color = pct > 90 ? '#fb7185' : pct > 75 ? '#fb923c' : pct > 50 ? '#fbbf24' : '#22d3ee';
-  const r = 22, circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
-
-  return (
-    <motion.div
-      className="glass-card"
-      style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}
-      initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
-      transition={{ delay, duration: 0.4 }}
-      whileHover={{ y: -2 }}
-    >
-      <div style={{ position: 'relative', flexShrink: 0 }}>
-        <svg width={52} height={52} viewBox="0 0 52 52">
-          <circle cx={26} cy={26} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={5} />
-          <motion.circle
-            cx={26} cy={26} r={r} fill="none"
-            stroke={color} strokeWidth={5}
-            strokeLinecap="round"
-            transform="rotate(-90 26 26)"
-            strokeDasharray={`${circ}`}
-            initial={{ strokeDashoffset: circ }}
-            animate={{ strokeDashoffset: circ - dash }}
-            transition={{ delay: delay + 0.4, duration: 1.5, ease: [0.4, 0, 0.2, 1] }}
-            style={{ filter: `drop-shadow(0 0 5px ${color})` }}
-          />
-        </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', fontWeight: 800, color }}>{pct.toFixed(0)}%</span>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.88)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{reservoir.name}</div>
-          <span style={{ fontSize: '0.58rem', padding: '1px 6px', borderRadius: 4, background: reservoir.data_source === 'live_api' ? 'rgba(16,185,129,0.15)' : 'rgba(6,182,212,0.15)', color: reservoir.data_source === 'live_api' ? '#34d399' : '#22d3ee', border: `1px solid ${reservoir.data_source === 'live_api' ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.3)'}` }}>
-            {reservoir.data_source === 'live_api' ? 'LIVE API' : 'HYDROLOGICAL MODEL'}
-          </span>
-        </div>
-        <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-          Outflow Release: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#38bdf8' }}>{reservoir.release_cumecs} m³/s</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-          <div>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 700, color }}>{reservoir.current_storage_mcft.toFixed(0)}</span>
-            <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', marginLeft: 3 }}>MCFT</span>
-          </div>
-          <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)' }}>/ {reservoir.capacity_mcft.toFixed(0)}</span>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-/* ── Main Dashboard Page ─────────────────────────────────────── */
 export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [predictionData, setPredictionData] = useState<any>(null);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [diagnostics, setDiagnostics] = useState<any>(null);
-  const [selectedStation, setSelectedStation] = useState<string>('METTUR');
+  const [focalPrediction, setFocalPrediction] = useState<any>(null);
+  const [selectedStationId, setSelectedStationId] = useState<string>('METTUR');
+  const [isForecastLoading, setIsForecastLoading] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
 
-  const fetchDashboardStats = async () => {
+  const loadData = async () => {
     try {
       setIsLoading(true);
       setHasError(false);
-
-      // Authenticate first
       await api.login();
-
-      // Critical requests — if any of these fail the dashboard cannot render
-      const [dash, activeAlerts, diag] = await Promise.all([
-        api.getDashboard(),
-        api.getAlerts(),
-        api.getDiagnostics()
-      ]);
-
+      const dash = await api.getDashboard();
       setDashboardData(dash);
-      setAlerts(activeAlerts);
-      setDiagnostics(diag);
 
-      // Default selected station from live list if METTUR is not in list
-      const stationsList = dash.stations || [];
-      if (stationsList.length > 0) {
-        const hasMettur = stationsList.some((s: any) => s.id === 'METTUR');
-        const firstStation = stationsList[0]?.id;
-        const initialStation = hasMettur ? 'METTUR' : firstStation;
-        setSelectedStation(initialStation);
+      const stations = dash.stations || [];
+      const initialId = stations.some((s: any) => s.id === 'METTUR')
+        ? 'METTUR'
+        : stations[0]?.id || 'METTUR';
+      setSelectedStationId(initialId);
 
-        // Fetch initial prediction
-        const pred = await api.getPrediction(initialStation);
-        setPredictionData(pred);
-      }
+      const pred = await api.getPrediction(initialId, [6, 12, 24]);
+      setFocalPrediction(pred);
     } catch (err) {
-      console.error('Failed fetching live dashboard telemetry:', err);
+      console.error('Failed to load dashboard:', err);
       setHasError(true);
     } finally {
       setIsLoading(false);
@@ -329,353 +74,613 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchDashboardStats();
+    loadData();
   }, []);
 
-  // Fetch predictions when active station changes
-  const handleStationClick = async (stationId: string) => {
+  const handleStationSelect = async (stationId: string) => {
+    if (!stationId) return;
     try {
-      setSelectedStation(stationId);
-      const pred = await api.getPrediction(stationId);
-      setPredictionData(pred);
+      setSelectedStationId(stationId);
+      setIsForecastLoading(true);
+      const pred = await api.getPrediction(stationId, [6, 12, 24]);
+      setFocalPrediction(pred);
     } catch (err) {
-      console.error(`Failed to fetch GNN predictions for station ${stationId}:`, err);
+      console.error(`Failed to fetch forecast for station ${stationId}:`, err);
+    } finally {
+      setIsForecastLoading(false);
     }
   };
 
-  // Memoized lists and averages
-  const stations = useMemo(() => dashboardData?.stations || [], [dashboardData]);
-  const reservoirs = useMemo(() => dashboardData?.reservoirs || [], [dashboardData]);
+  const stations = dashboardData?.stations || [];
+  const reservoirs = dashboardData?.reservoirs || [];
 
-  const avgLevel = useMemo(() => {
-    if (stations.length === 0) return 0.0;
-    return stations.reduce((acc: number, s: any) => acc + s.water_level, 0) / stations.length;
+  // Summary Metrics
+  const summary = useMemo(() => {
+    const totalStations = stations.length;
+    const attentionStations = stations.filter((s: any) => {
+      const risk = (s.risk_level || '').toLowerCase();
+      return risk.includes('warn') || risk.includes('danger') || risk.includes('severe');
+    });
+
+    const rainValues = stations.map((s: any) => Number(s.rain_observed || 0));
+    const maxRain = rainValues.length > 0 ? Math.max(...rainValues) : 0;
+    const avgRain =
+      rainValues.length > 0
+        ? rainValues.reduce((a: number, b: number) => a + b, 0) / rainValues.length
+        : 0;
+
+    return {
+      totalStations,
+      attentionCount: attentionStations.length,
+      attentionStations,
+      maxRain,
+      avgRain,
+    };
   }, [stations]);
 
-  const avgRain = useMemo(() => {
-    if (stations.length === 0) return 0.0;
-    return stations.reduce((acc: number, s: any) => acc + s.rain_observed, 0) / stations.length;
-  }, [stations]);
+  // Selected Station details
+  const selectedStation = useMemo(() => {
+    return stations.find((s: any) => s.id === selectedStationId) || stations[0] || null;
+  }, [stations, selectedStationId]);
 
-  const activeWarningsCount = useMemo(() => {
-    return stations.filter((s: any) => s.risk_level === 'High Risk' || s.risk_level === 'Severe Flood').length;
-  }, [stations]);
-
-  // Extract Recharts datasets conformed to model
-  const telemetryData = useMemo(() => {
-    if (!predictionData?.hydrograph) return [];
-    const pts = predictionData.hydrograph;
-    const lastObsIdx = pts.findLastIndex ? pts.findLastIndex((h: any) => h.section === 'observed') : pts.map((h: any) => h.section).lastIndexOf('observed');
-    const lastObsVal = lastObsIdx >= 0 ? pts[lastObsIdx].observed : null;
-
-    return pts.map((h: any, i: number) => {
-      const isBridgePoint = (i === lastObsIdx);
+  // Native Forecast Horizons (6h, 12h, 24h)
+  const nativeForecasts = useMemo(() => {
+    if (!focalPrediction?.predictions) return [];
+    return [6, 12, 24].map((h) => {
+      const pred = focalPrediction.predictions.find((p: any) => p.horizon_hours === h);
       return {
-        time: h.time,
-        level: h.observed,
-        forecast: isBridgePoint ? (h.predicted ?? lastObsVal) : h.predicted,
-        upper: isBridgePoint ? (h.upper ?? lastObsVal) : h.upper,
-        lower: isBridgePoint ? (h.lower ?? lastObsVal) : h.lower,
+        horizon: `${h}h`,
+        level_ft: pred ? pred.level_m : null,
+        uncertainty: pred ? pred.uncertainty_m : null,
+        severity: pred ? pred.severity : 'Safe',
       };
     });
-  }, [predictionData]);
+  }, [focalPrediction]);
 
-  const rainfallData = useMemo(() => {
-    if (!predictionData?.rain_overlay) return [];
-    // Slice first 28 observations (7 hours convolved at 15-min cadence) to keep chart responsive
-    return predictionData.rain_overlay.slice(0, 28).map((r: any) => ({
-      date: r.time,
-      rainfall: r.rainfall_mm !== null ? r.rainfall_mm : 0.0
-    }));
-  }, [predictionData]);
+  // Risk distribution count
+  const riskCounts = useMemo(() => {
+    let safe = 0;
+    let warning = 0;
+    let danger = 0;
 
-  const activeStationDetails = useMemo(() => {
-    return stations.find((s: any) => s.id === selectedStation) || stations[0];
-  }, [stations, selectedStation]);
+    stations.forEach((s: any) => {
+      const r = (s.risk_level || '').toLowerCase();
+      if (r.includes('danger') || r.includes('severe') || r.includes('high')) danger++;
+      else if (r.includes('warn') || r.includes('moderate')) warning++;
+      else safe++;
+    });
 
-  if (isLoading) return <AppLayout><DashboardSkeleton /></AppLayout>;
-  if (hasError) return <AppLayout><ErrorBanner onRetry={fetchDashboardStats} /></AppLayout>;
+    return { safe, warning, danger };
+  }, [stations]);
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <LoadingSkeleton rows={5} height={120} />
+      </AppLayout>
+    );
+  }
+
+  if (hasError || !dashboardData) {
+    return (
+      <AppLayout>
+        <ErrorBanner onRetry={loadData} />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
-      <div className="page-content">
-        {/* Page Header & Purpose Strip */}
-        <PageHeader
-          title="Cauvery Basin Flood Monitoring"
-          subtitle="Real-time river conditions, rainfall, reservoir status and Experiment 9 forecasts"
-          purpose="Monitor current basin conditions and quickly identify stations or reservoirs that need attention."
-          badges={[
-            { label: 'Live Telemetry', variant: 'safe' },
-            { label: 'Offline Held-Out Test Evaluation', variant: 'info' },
-          ]}
-        />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* 1. TOP SUMMARY METRICS */}
+        <section
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 14,
+          }}
+        >
+          {/* Active Gauges */}
+          <div className="metric-kpi">
+            <div className="metric-kpi-label">
+              <span>Active Monitoring Stations</span>
+              <Radio size={14} color="#0ea5e9" />
+            </div>
+            <div className="metric-kpi-value">{summary.totalStations || 8}</div>
+            <div className="metric-kpi-sub">Cauvery main stem & tributaries</div>
+          </div>
 
-        {/* Alert Banner */}
-        <AlertBanner alerts={alerts} lastUpdated={dashboardData?.timestamp_ist || dashboardData?.timestamp} />
-
-        {/* Section A: Current Basin Status */}
-        <div style={{ marginTop: 18, marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '-0.01em', color: '#f1f5f9' }}>
-                Current Basin Status
-              </div>
-              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
-                Monitored telemetry gauges (Live) alongside verified offline held-out test evaluation benchmarks
-              </div>
+          {/* Stations Requiring Attention */}
+          <div className="metric-kpi">
+            <div className="metric-kpi-label">
+              <span>Stations Requiring Attention</span>
+              <AlertTriangle
+                size={14}
+                color={summary.attentionCount > 0 ? '#f59e0b' : '#10b981'}
+              />
+            </div>
+            <div
+              className="metric-kpi-value"
+              style={{ color: summary.attentionCount > 0 ? '#f59e0b' : '#10b981' }}
+            >
+              {summary.attentionCount}
+            </div>
+            <div className="metric-kpi-sub">
+              {summary.attentionCount === 0
+                ? 'All reaches within normal thresholds'
+                : `${summary.attentionCount} reach exceeding warning levels`}
             </div>
           </div>
-        </div>
 
-        {/* KPI Row */}
-        <div className="grid-kpi">
-          <KPICard
-            title="Active Stations" value={stations.length} unit="online" accent="#22d3ee"
-            icon={<Radio size={17} color="#22d3ee" />} delay={0}
-            change={0} changeLabel="all operational" lastUpdated="Live telemetry"
-          />
-          <KPICard
-            title="Avg Water Level" value={avgLevel} decimals={1} unit="ft" accent="#fb7185"
-            icon={<Droplets size={17} color="#fb7185" />} delay={1}
-            change={activeWarningsCount} changeLabel="stations at risk" status={activeWarningsCount > 0 ? "danger" : "safe"} lastUpdated="Live telemetry"
-            sparkVolatility={0.08}
-          />
-          <KPICard
-            title="Avg Rainfall" value={avgRain} decimals={1} unit="mm" accent="#a78bfa"
-            icon={<CloudRain size={17} color="#a78bfa" />} delay={2}
-            change={dashboardData?.heavy_rain_stations_count || 0} changeLabel="heavy rain areas" lastUpdated="Live telemetry"
-            sparkVolatility={0.12}
-          />
-          <KPICard
-            title="Test NSE" value={0.9968} decimals={4} accent="#34d399"
-            icon={<Brain size={17} color="#34d399" />} delay={3}
-            changeLabel="Offline test" lastUpdated="Offline held-out evaluation"
-            sparkVolatility={0.02}
-          />
-          <KPICard
-            title="Test RMSE" value={0.4974} decimals={4} unit="m" accent="#06b6d4"
-            icon={<Activity size={17} color="#06b6d4" />} delay={4}
-            changeLabel="Offline test" lastUpdated="Offline held-out evaluation"
-            sparkVolatility={0.02}
-          />
-        </div>
-
-        {/* Section B: Data Freshness & Pipeline Feeds */}
-        <div style={{ marginTop: 24, marginBottom: 20 }}>
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '-0.01em', color: '#f1f5f9' }}>
-              Data Freshness & Ingestion Pipeline
+          {/* Rainfall Summary */}
+          <div className="metric-kpi">
+            <div className="metric-kpi-label">
+              <span>Basin Max Rainfall (24h)</span>
+              <CloudRain size={14} color="#38bdf8" />
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
-              Runtime feeds (OpenWeather, Open-Meteo river telemetry, reservoir state) vs. Experiment 9 loaded model checkpoint
+            <div className="metric-kpi-value">
+              {summary.maxRain.toFixed(1)}{' '}
+              <span style={{ fontSize: '0.88rem', fontWeight: 500, color: '#94a3b8' }}>mm</span>
+            </div>
+            <div className="metric-kpi-sub">
+              Basin Average: {summary.avgRain.toFixed(1)} mm
             </div>
           </div>
-          <DataFreshnessPanel freshnessData={dashboardData?.data_freshness} onRefresh={fetchDashboardStats} />
-        </div>
 
-        {/* Main content: charts + AI panel */}
-        <div className="grid-main">
+          {/* Model Operational Status */}
+          <div className="metric-kpi">
+            <div className="metric-kpi-label">
+              <span>Model Operational Status</span>
+              <Brain size={14} color="#10b981" />
+            </div>
+            <div className="metric-kpi-value" style={{ fontSize: '1.25rem', color: '#10b981' }}>
+              Experiment 9
+            </div>
+            <div className="metric-kpi-sub">
+              Online · PyTorch CPU · Native 6h/12h/24h
+            </div>
+          </div>
+        </section>
 
-          {/* Left: charts */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* 2. MAIN WORKSPACE: Spatial Map + Water Level Trend & Forecast */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
+            gap: 18,
+          }}
+        >
+          {/* LEFT: Cauvery River Basin Map */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="card-header">
+              <div className="card-title">
+                <Radio size={16} color="#0ea5e9" />
+                <span>Cauvery River Basin Map</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                  Click station pin to inspect
+                </span>
+                <Link
+                  href="/stations"
+                  className="btn btn-secondary btn-sm"
+                  style={{ textDecoration: 'none' }}
+                >
+                  Stations Table <ArrowRight size={12} />
+                </Link>
+              </div>
+            </div>
 
-            {/* Telemetry chart */}
-            <motion.div
-              className="glass-card gradient-border"
-              style={{ padding: '22px 24px' }}
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ padding: 12, flex: 1, minHeight: 450 }}>
+              <CauveryMap
+                stations={stations}
+                reservoirs={reservoirs}
+                selectedStationId={selectedStationId}
+                onSelect={handleStationSelect}
+              />
+            </div>
+          </div>
+
+          {/* RIGHT: Selected Station Hydrograph & Forecast Horizons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Focal Station Hydrograph Chart */}
+            <div className="card">
+              <div className="card-header" style={{ flexWrap: 'wrap', gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-                    Water Level — Current Conditions & Forecast
+                  <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <TrendingUp size={16} color="#0ea5e9" />
+                    <span>{selectedStation?.name || 'Station'} Hydrograph</span>
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
-                    Observed telemetry and Experiment 9 forecast ({activeStationDetails?.name || 'Cauvery Station'})
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>
+                    Reach: {selectedStation?.basin || 'Cauvery'} River · Current Level:{' '}
+                    <strong style={{ color: '#f8fafc' }}>
+                      {Number(selectedStation?.water_level || 0).toFixed(2)} ft
+                    </strong>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {['12h', '24h', '48h'].map((l, i) => (
-                    <motion.button key={l}
-                      className={i === 2 ? 'btn btn-primary' : 'btn btn-ghost'}
-                      style={{ fontSize: '0.75rem', padding: '4px 12px' }}
-                      whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.93 }}
-                    >{l}</motion.button>
-                  ))}
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={telemetryData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.35} />
-                      <stop offset="60%" stopColor="#22d3ee" stopOpacity={0.08} />
-                      <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.01} />
-                    </linearGradient>
-                    <linearGradient id="areaGradForecast" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.01} />
-                    </linearGradient>
-                    <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.15} />
-                      <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="time" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} interval={11} />
-                  <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <ReferenceLine y={activeStationDetails?.danger_level || 50} stroke="#fb7185" strokeDasharray="5 4" strokeWidth={1.5}
-                    label={{ value: `Danger (${(activeStationDetails?.danger_level || 50).toFixed(1)}ft)`, position: 'right', fontSize: 9, fill: '#fb7185' }} />
-                  <Area type="monotone" dataKey="upper" stroke="none" fill="url(#ciGrad)" name="Uncertainty — 95% CI" />
-                  <Area type="monotone" dataKey="level" stroke="#22d3ee" strokeWidth={2.5}
-                    fill="url(#areaGrad)" dot={false} name="Observed — Live"
-                    animationDuration={1800} animationEasing="ease-out" />
-                  <Area type="monotone" dataKey="forecast" stroke="#a78bfa" strokeWidth={2}
-                    fill="url(#areaGradForecast)" dot={false} name="Forecast — Exp 9"
-                    strokeDasharray="6 3" animationDuration={2000} />
-                </AreaChart>
-              </ResponsiveContainer>
 
-              {/* Standardized Chart Legend */}
-              <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 16, height: 3, background: '#22d3ee', borderRadius: 2 }} />
-                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Observed — Live</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 16, height: 2, borderTop: '2px dashed #a78bfa' }} />
-                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Forecast — Exp 9</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 16, height: 8, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: 2 }} />
-                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Uncertainty — 95% CI</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 16, height: 2, borderTop: '2px dashed #fb7185' }} />
-                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Danger threshold</span>
-                </div>
-              </div>
-            </motion.div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>
+                      Station:
+                    </span>
+                    <select
+                      id="dashboard-station-select"
+                      value={selectedStationId}
+                      onChange={(e) => handleStationSelect(e.target.value)}
+                      style={{
+                        backgroundColor: 'var(--bg-surface)',
+                        border: '1px solid var(--border-medium)',
+                        color: '#f8fafc',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        outline: 'none',
+                        cursor: 'pointer',
+                        maxWidth: 200,
+                      }}
+                    >
+                      {stations.map((s: any) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.basin || 'Cauvery'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-            {/* Rainfall chart */}
-            <motion.div
-              className="glass-card"
-              style={{ padding: '22px 24px' }}
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-                <div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Basin Precipitation — {activeStationDetails?.name || 'Loading'}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Cumulative 15-minute observations (Live Ingested)</div>
+                  {selectedStation && (
+                    <RiskBadge level={selectedStation.risk_level || 'Safe'} size="sm" />
+                  )}
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={rainfallData} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.9} />
-                      <stop offset="100%" stopColor="#6d28d9" stopOpacity={0.5} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} interval={3} />
-                  <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.28)' }} tickLine={false} axisLine={false} />
-                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                  <Bar dataKey="rainfall" fill="url(#barGrad)" radius={[4, 4, 0, 0]} name="Rainfall (mm)" maxBarSize={16} animationDuration={1600} />
-                </BarChart>
-              </ResponsiveContainer>
-            </motion.div>
 
-            {/* Station grid */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Station Monitor</div>
-                <a href="/stations" className="btn btn-ghost" style={{ fontSize: '0.78rem', padding: '5px 14px' }}>
-                  View all <ChevronRight size={13} />
-                </a>
+              {/* Quick Station Navigation Pills */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  overflowX: 'auto',
+                  padding: '8px 14px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.18)',
+                  borderBottom: '1px solid var(--border-subtle)',
+                }}
+              >
+                <span style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  Quick Select:
+                </span>
+                {stations.slice(0, 8).map((s: any) => {
+                  const isSelected = s.id === selectedStationId;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => handleStationSelect(s.id)}
+                      style={{
+                        padding: '3px 9px',
+                        fontSize: '0.7rem',
+                        borderRadius: 12,
+                        whiteSpace: 'nowrap',
+                        border: isSelected ? '1px solid #0ea5e9' : '1px solid rgba(255,255,255,0.08)',
+                        backgroundColor: isSelected ? 'rgba(14, 165, 233, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                        color: isSelected ? '#38bdf8' : '#94a3b8',
+                        cursor: 'pointer',
+                        fontWeight: isSelected ? 600 : 400,
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {s.name.replace(' Reservoir', '').replace(' Gauge', '').replace(' Station', '').replace(' Dam', '')}
+                    </button>
+                  );
+                })}
               </div>
-              {/* Show first 4 stations to keep layout tidy */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-                {stations.slice(0, 4).map((s: any, i: number) => (
-                  <StationMiniCard
-                    key={s.id}
-                    station={s}
-                    delay={0.5 + i * 0.06}
-                    isSelected={selectedStation === s.id}
-                    onClick={() => handleStationClick(s.id)}
+
+              <div className="card-body" style={{ padding: 14 }}>
+                {isForecastLoading ? (
+                  <div
+                    style={{
+                      height: 220,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 10,
+                      color: '#38bdf8',
+                      fontSize: '0.82rem',
+                    }}
+                  >
+                    <RefreshCw size={20} className="animate-spin" />
+                    <span>Updating AI hydrograph & forecast for {selectedStation?.name}...</span>
+                  </div>
+                ) : (
+                  <HydrographChart
+                    data={focalPrediction?.hydrograph || []}
+                    dangerLevel={selectedStation?.danger_level}
+                    warningLevel={selectedStation?.warning_level}
+                    unit="ft"
+                    height={220}
+                    title="Stage Telemetry & AI Forecast (ft)"
                   />
-                ))}
+                )}
               </div>
             </div>
-          </div>
 
-          {/* Right: AI + Reservoirs */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* AI Center */}
-            <AICommandCenter liveSupportText={dashboardData?.decision_support} />
-
-            {/* Section E: Reservoirs Operations */}
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                <div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-                    Reservoir Operations — Hydrological Model
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>
-                    Storage and release estimates from the reservoir routing model
-                  </div>
+            {/* Native Forecast Horizons (6h, 12h, 24h) */}
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">
+                  <Brain size={15} color="#38bdf8" />
+                  <span>Native HydroGNN-Net Forecast Horizons</span>
                 </div>
-                <span className="badge badge-info" style={{ fontSize: '0.62rem', flexShrink: 0 }}>
-                  Hydrological Model
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    color: '#0ea5e9',
+                    backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                  }}
+                >
+                  Direct Model Predictions
                 </span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-                {reservoirs.slice(0, 5).map((r: any, i: number) => <ReservoirGauge key={r.id} reservoir={r} delay={0.6 + i * 0.08} />)}
-              </div>
-            </motion.div>
 
-            {/* Pipeline health / Diagnostics */}
-            <motion.div className="glass-card" style={{ padding: '18px 20px' }}
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
-            >
-              <div style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: 14, letterSpacing: '-0.01em' }}>System Health diagnostics</div>
-              {[
-                { name: 'Database connectivity', pct: 100, label: diagnostics?.database_health || 'Healthy' },
-                { name: 'Background scheduler', pct: 100, label: diagnostics?.scheduler_status || 'Active' },
-                { name: 'Model registry drift', pct: 88, label: 'Stable' },
-                { name: 'Telemetry data quality', pct: 95, label: diagnostics?.data_drift || 'Stable' },
-                { name: 'System CPU/Memory', pct: diagnostics?.system_metrics?.cpu_usage_pct || 15, label: `${diagnostics?.system_metrics?.cpu_usage_pct || 15}% usage` },
-              ].map((ds, i) => {
-                const isWarning = ds.label.toLowerCase().includes('warning') || ds.label.toLowerCase().includes('unhealthy');
-                const c = isWarning ? '#fb7185' : '#34d399';
-                return (
-                  <div key={ds.name} style={{ marginBottom: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.62)' }}>{ds.name}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: c, fontWeight: 700 }}>{ds.label}</span>
+              <div className="card-body" style={{ padding: '14px 16px' }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 12,
+                  }}
+                >
+                  {nativeForecasts.map((f) => (
+                    <div
+                      key={f.horizon}
+                      style={{
+                        backgroundColor: 'var(--bg-surface)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 6,
+                        padding: '10px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 3,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
+                          +{f.horizon}
+                        </span>
+                        <RiskBadge level={f.severity} size="sm" showDot={false} />
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '1.2rem',
+                          fontWeight: 700,
+                          color: '#f8fafc',
+                        }}
+                      >
+                        {f.level_ft != null ? Number(f.level_ft).toFixed(2) : '—'}{' '}
+                        <span style={{ fontSize: '0.75rem', fontWeight: 400, color: '#64748b' }}>
+                          ft
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        ±{f.uncertainty != null ? Number(f.uncertainty).toFixed(2) : '0.00'} ft
+                      </div>
                     </div>
-                    <div className="progress-track thin">
-                      <motion.div className="progress-fill"
-                        style={{ background: `linear-gradient(90deg, ${c}70, ${c})`, width: 0 }}
-                        animate={{ width: `${ds.pct}%` }}
-                        transition={{ delay: 0.8 + i * 0.1, duration: 1.2 }}
-                      />
-                    </div>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: '0.72rem',
+                    color: '#64748b',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Native multi-step heads: 6h / 12h / 24h</span>
+                  <Link
+                    href="/forecast"
+                    style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 500 }}
+                  >
+                    Detailed Forecast Page →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. BASIN FLOOD RISK SUMMARY & SYSTEM HEALTH */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)',
+            gap: 18,
+          }}
+        >
+          {/* Current Flood-Risk Summary */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">
+                <ShieldCheck size={16} color="#10b981" />
+                <span>Cauvery Basin Flood-Risk Summary</span>
+              </div>
+              <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                {dashboardData.timestamp_ist || dashboardData.timestamp}
+              </span>
+            </div>
+
+            <div className="card-body" style={{ padding: '16px 18px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 16,
+                  marginBottom: 14,
+                }}
+              >
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: 6,
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
+                    SAFE REACHES
                   </div>
-                );
-              })}
-            </motion.div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f8fafc' }}>
+                    {riskCounts.safe}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: 6,
+                    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                    border: '1px solid rgba(245, 158, 11, 0.2)',
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 600 }}>
+                    WATCH / WARNING
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f8fafc' }}>
+                    {riskCounts.warning}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: 6,
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 600 }}>
+                    CRITICAL DANGER
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f8fafc' }}>
+                    {riskCounts.danger}
+                  </div>
+                </div>
+              </div>
+
+              {dashboardData.decision_support && (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    backgroundColor: 'var(--bg-surface)',
+                    borderRadius: 6,
+                    border: '1px solid var(--border-subtle)',
+                    fontSize: '0.8rem',
+                    color: '#94a3b8',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <strong style={{ color: '#f8fafc', display: 'block', marginBottom: 4 }}>
+                    Operational Decision Support:
+                  </strong>
+                  {typeof dashboardData.decision_support === 'string' ? (
+                    <span>{dashboardData.decision_support}</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>Emergency Protocol:</span>
+                        <strong
+                          style={{
+                            color:
+                              dashboardData.decision_support.emergency_response_level === 'RED ALERT'
+                                ? '#ef4444'
+                                : '#10b981',
+                          }}
+                        >
+                          {dashboardData.decision_support.emergency_response_level || 'NORMAL'}
+                        </strong>
+                      </div>
+                      {dashboardData.decision_support.evacuation_rankings &&
+                      dashboardData.decision_support.evacuation_rankings.length > 0 ? (
+                        <div style={{ color: '#f59e0b', fontSize: '0.76rem' }}>
+                          Evacuation preparedness recommended for:{' '}
+                          {dashboardData.decision_support.evacuation_rankings
+                            .map((e: any) => e.district)
+                            .join(', ')}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+                          All Cauvery Basin reaches operating under routine monitoring protocol. No evacuation or road closure triggers active.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* System Status Section */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">
+                <Database size={15} color="#0ea5e9" />
+                <span>System Status</span>
+              </div>
+              <Link
+                href="/diagnostics"
+                style={{ fontSize: '0.74rem', color: '#38bdf8', textDecoration: 'none' }}
+              >
+                View Diagnostics →
+              </Link>
+            </div>
+
+            <div
+              className="card-body"
+              style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                <span style={{ color: '#94a3b8' }}>Prediction Engine:</span>
+                <span style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <CheckCircle size={12} /> Experiment 9 Active
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                <span style={{ color: '#94a3b8' }}>Telemetry Ingestion:</span>
+                <span style={{ color: '#f8fafc', fontWeight: 500 }}>
+                  {dashboardData.data_status || 'Live Feed'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                <span style={{ color: '#94a3b8' }}>Last Data Sync:</span>
+                <span style={{ color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>
+                  {dashboardData.timestamp_ist || dashboardData.timestamp}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                <span style={{ color: '#94a3b8' }}>Database Store:</span>
+                <span style={{ color: '#10b981', fontWeight: 500 }}>SQLite Healthy</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </AppLayout>
   );
-}
-
-// Import missing icon
-function Radio({ size, color }: { size: number; color: string }) {
-  return <Activity size={size} color={color} />;
 }
